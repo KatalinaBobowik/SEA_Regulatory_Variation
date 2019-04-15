@@ -37,6 +37,7 @@ if (file.exists(outputdir) == FALSE){
 # Load colour schemes:
 wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467","#5B1A18")
 palette(c(wes, brewer.pal(8,"Dark2")))
+dev.off()
 # set up colour palette for batch
 batch.col=electronic_night(n=3)
 
@@ -59,37 +60,34 @@ for (name in covariate.names){
 }
 
 # Age, RIN, and library size need to be broken up into chunks for easier visualisation of trends (for instance in Age, we want to see high age vs low age rather than the effect of every single age variable)
-Age <- cut(as.numeric(as.character(y$samples$Age)), c(14,24,34,44,54,64,74,84), labels=c("15-24","25-34", "35-44", "45-54", "55-64", "65-74", "75-84"))
-RIN <- cut(as.numeric(as.character(y$samples$RIN)), c(4.9,5.9,6.9,7.9,8.9), labels=c("5.0-5.9", "6.0-6.9", "7.0-7.9", "8.0-8.9"))
-lib.size <- cut(as.numeric(y$samples$lib.size), c(8000000,12000000,16000000,20000000,24000000), labels=c("8e+06-1.2e+07","1.2e+07-1.6e+07", "1.6e+07-2e+07", "2e+07-4.4e+07"))
+for (name in c("Age","RIN","lib.size")){
+  assign(name, cut(as.numeric(as.character(y$samples[[paste0(name)]])), breaks=5))
+}
 
 # assign names to covariate names so you can grab individual elements by name
 names(covariate.names)=covariate.names
 
+# assign factor variables
+factorVariables=c(colnames(Filter(is.factor,y$samples))[which(colnames(Filter(is.factor,y$samples)) %in% covariate.names)], "Age", "lib.size", "RIN")
+numericVariables=colnames(Filter(is.numeric,y$samples))[which(colnames(Filter(is.numeric,y$samples)) %in% covariate.names)] %>% subset(., !(. %in% factorVariables))
+
 # MDS
-pdf(paste0(outputdir,"indoRNA_MDS_123Combined_allCovariates.pdf"), height=30, width=25)
-par(mfrow=c(5,4))
-for (name in colnames(Filter(is.factor,y$samples))[-c(1,2)]) {
+pdf(paste0(outputdir,"indoRNA_MDS_123Combined_allCovariates.pdf"), height=10, width=10)
+for (name in factorVariables) {
     plotMDS(lcpm, labels=get(name), col=as.numeric(get(name)))
     title(main=name)
 }
 # plot batch separately (this has its own colouring scheme)
 plotMDS(lcpm, labels=batch, col=batch.col[as.numeric(batch)])
 title(main="batch")
-# plot blood (this is a gradient colouring scheme)
-for (name in covariate.names[c("Gran","Bcell","CD4T","CD8T","NK","Mono")]) {
+
+# plot numeric variables
+for (name in numericVariables) {
     # assign gradient colours for blood cell types
-    initial <- cut(get(name), breaks = seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
+    # initial <- cut(get(name), breaks = seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
+    initial = .bincode(get(name), breaks=seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
     bloodCol <- colorRampPalette(c("blue", "red"))(79)[initial]
     plotMDS(lcpm, labels=get(name), col=bloodCol)
-    title(main=name)
-}
-# plot PF and VX load info
-for (name in covariate.names[grep("reads", covariate.names)]){
-    # assign gradient colours for load intensity
-    initial <- cut(get(name), breaks = seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
-    plasmoCol <- colorRampPalette(c("blue", "red"))(79)[initial]
-    plotMDS(lcpm, labels=get(name), col=plasmoCol)
     title(main=name)
 }
 dev.off()
@@ -108,7 +106,7 @@ allreps=covariates[,1][which(covariates$replicate)]
 allreps=unique(allreps)
 allreplicated=as.factor(samplenames %in% allreps)
 
-# get which samples are replicates
+# get which samples are replicates - we need this information to label replicates in the PCA plots
 allreplicated=as.factor(samplenames %in% allreps)
 
 # PCA plotting function
@@ -147,11 +145,13 @@ pc.assoc <- function(pca.data){
     return (all.pcs)
 }
 
+# get rid of covariates we aren't interested in
+covariate.names=covariate.names[grep("lib.size|ID|microscopy.po|PCR.pos|fract.pfpx.reads|replicate",covariate.names, invert=T)]
 # Prepare covariate matrix
 all.covars.df <- y$samples[,covariate.names]
 
 # Plot PCA
-for (name in covariate.names[1:12]){
+for (name in factorVariables){
   if (nlevels(get(name)) < 26){
     pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
     pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=as.numeric(get(name)),namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
@@ -169,24 +169,13 @@ name="batch"
 pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=batch.col[as.numeric(batch)],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=batch)
 dev.off()
   
-# plot blood
-for (name in covariate.names[c("Gran","Bcell","CD4T","CD8T","NK","Mono")]){
-    initial <- cut(get(name), breaks = seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
+# plot numeric variables
+for (name in numericVariables){
+    initial = .bincode(get(name), breaks=seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
     bloodCol <- colorRampPalette(c("blue", "red"))(79)[initial]
     pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
     pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=bloodCol,namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
     legend(legend=c("High","Low"), pch=16, x="bottomright", col=c(bloodCol[which.max(get(name))], bloodCol[which.min(get(name))]), cex=0.6, title=name, border=F, bty="n")
-    legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
-    dev.off()
-}
-
-# plot VX and PF load
-for (name in covariate.names[grep("reads", covariate.names)]){
-    initial <- cut(get(name), breaks = seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
-    plasmoCol <- colorRampPalette(c("blue", "red"))(79)[initial]
-    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
-    pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=plasmoCol,namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
-    legend(legend=c("High","Low"), pch=16, x="bottomright", col=c(plasmoCol[which.max(get(name))], plasmoCol[which.min(get(name))]), cex=0.6, title=name, border=F, bty="n")
     legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
     dev.off()
 }
@@ -197,7 +186,7 @@ all.pcs$Variance <- pcaresults$sdev^2/sum(pcaresults$sdev^2)
 
 # plot pca covariates association matrix to illustrate any potential confounding and evidence for batches
 pdf(paste0(outputdir,"significantCovariates_AnovaHeatmap.pdf"))
-pheatmap(all.pcs[1:5,c(3:ncol(all.pcs)-1)], cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
+pheatmap(all.pcs[1:5,covariate.names], cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
 dev.off()
 
 # Write out the covariates:
@@ -355,7 +344,6 @@ upper.panel<-function(x, y){
   par(usr = c(0, 1, 0, 1))
   text(0.5, 0.9, txt)
 }
-
 pairs(rv, lower.panel = NULL, upper.panel = upper.panel, main="Gene Variance")
 dev.off()
 

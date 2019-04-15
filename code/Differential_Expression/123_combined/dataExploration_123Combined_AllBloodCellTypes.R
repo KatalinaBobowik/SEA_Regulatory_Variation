@@ -37,6 +37,7 @@ if (file.exists(outputdir) == FALSE){
 # Load colour schemes:
 wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467","#5B1A18")
 palette(c(wes, brewer.pal(8,"Dark2")))
+dev.off()
 # set up colour palette for batch
 batch.col=electronic_night(n=3)
 
@@ -71,7 +72,7 @@ factorVariables=c(colnames(Filter(is.factor,y$samples))[which(colnames(Filter(is
 numericVariables=colnames(Filter(is.numeric,y$samples))[which(colnames(Filter(is.numeric,y$samples)) %in% covariate.names)] %>% subset(., !(. %in% factorVariables))
 
 # MDS
-pdf(paste0(outputdir,"indoRNA_MDS_123Combined_allCovariates.pdf"), height=30, width=25)
+pdf(paste0(outputdir,"indoRNA_MDS_123Combined_allCovariates.pdf"), height=10, width=10)
 for (name in factorVariables) {
     plotMDS(lcpm, labels=get(name), col=as.numeric(get(name)))
     title(main=name)
@@ -181,9 +182,12 @@ for (name in numericVariables){
 all.pcs <- pc.assoc(pcaresults)
 all.pcs$Variance <- pcaresults$sdev^2/sum(pcaresults$sdev^2)
 
+# get rid og library size and normative factors in covariate names
+covariate.names=covariate.names[grep("lib.size|norm.factors",covariate.names, invert=T)]
+
 # plot pca covariates association matrix to illustrate any potential confounding and evidence for batches
 pdf(paste0(outputdir,"significantCovariates_AnovaHeatmap.pdf"))
-pheatmap(all.pcs[1:5,c(1:ncol(all.pcs)-1)], cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
+pheatmap(all.pcs[1:5,covariate.names], cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
 dev.off()
 
 # Write out the covariates:

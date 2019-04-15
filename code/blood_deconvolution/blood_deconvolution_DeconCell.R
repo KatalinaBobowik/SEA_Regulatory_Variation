@@ -1,7 +1,7 @@
 # Test out DeconCell for deconvoluting blood using RNASeq data from 123 Indonesian samples
 # Code developed by Katalina Bobowik, 26.02.2019
 # following the vignette as per: http://htmlpreview.github.io/?https://github.com/molgenis/systemsgenetics/blob/master/Decon2/DeconCell/inst/doc/my-vignette.html
-
+# and the vignette: https://github.com/molgenis/systemsgenetics/tree/master/Decon2
 
 # load packages
 library(devtools)
@@ -10,6 +10,9 @@ library(edgeR)
 library(tidyverse)
 library(ghibli)
 library(Rcmdr)
+library(RColorBrewer)
+library(stringr)
+library(matrixStats)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/countData/"
@@ -52,6 +55,20 @@ pdf(paste0(outputdir,"DeconCell_RNASeqDeconvolution.pdf"), height=10,width=19)
 par(mar=c(14.1,4.1,10.1,2.1),xpd=T)
 barplot(t(predicted.cellcounts), col=c("#ffd92f","#e78ac3","#fc8d62","#66c2a5","#8da0cb","#a6d854"), las=3)
 legend(123,130,legend=colnames(predicted.cellcounts), col=c("#ffd92f","#e78ac3","#fc8d62","#66c2a5","#8da0cb","#a6d854"), pch=15, cex=0.8)
+dev.off()
+
+shortenedCellnames  <- paste(word(colnames(prediction$dCell.prediction), 1), word(colnames(prediction$dCell.prediction), 2),sep=" ")
+shortenedCellnames = gsub("NA", "", shortenedCellnames)
+col=brewer.pal(8,"Dark2")
+pdf(paste0(outputdir,"allCelltypesBoxplot.pdf"), height=20,width=10)
+par(mfrow=c(3,1))
+for (island in c("SMB","MTW","MPI")){
+	median=cbind(colnames(prediction$dCell.prediction),colMedians(prediction$dCell.prediction[grep(island,rownames(prediction$dCell.prediction)),]))
+	write.table(median, file=paste0(outputdir,island,"_medianValues_allCellTypes.txt"))
+	mean=colMeans(prediction$dCell.prediction[grep(island,rownames(prediction$dCell.prediction)),])
+	write.table(mean, file=paste0(outputdir,island,"_meanValues_allCellTypes.txt"))
+	boxplot(prediction$dCell.prediction[grep(island,rownames(prediction$dCell.prediction)),], las=3, col=col, main=island, cex.names=0.5, names=shortenedCellnames)
+}
 dev.off()
 
 # Compare old deconvolution data to new deconvolution data ------------------------

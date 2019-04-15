@@ -2,14 +2,20 @@
 # Perform DE analysing relationship between islands using RUVs as batch correction method
 
 # load dependencies: libraries, human count data and data preprocessing
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/countData_123_combined.R")
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/dataPreprocessing_123_combined.R")
 source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/batch_effects/RUVs_Setup.R")
+
+inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
 
 # set working directory
 setwd("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/DE_Island/RUVs")
 
 # setup DGE list object --------------------------------------------------------------------------------------------------
+
+# Load log CPM matrix and y object:
+# lcpm
+load(paste0(inputdir, "indoRNA.logCPM.TMM.filtered.Rda"))
+# y DGE list object
+load(paste0(inputdir, "indoRNA.read_counts.TMM.filtered.Rda"))
 
 design <- model.matrix(~0 + Island + W_1 + W_2 + W_3 + W_4 + W_5, data=pData(set1))
 colnames(design)=gsub("Island", "", colnames(design))

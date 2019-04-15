@@ -50,6 +50,7 @@ dev.off()
 
 # Set working directory
 setwd("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/Yamagishi")
+outputdir="/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/Yamagishi/"
 
 # read in count files for sick samples
 files.sick=list.files(path="/Users/katalinabobowik/Documents/UniMelb_PhD/Projects/Yamagishi", pattern="Filter", full.names=T)
@@ -63,6 +64,8 @@ genes <- select(Homo.sapiens, keys=geneid, columns=c("SYMBOL", "TXCHROM"), keyty
 # Check for and remove duplicated gene IDs, then add genes dataframe to DGEList object
 genes <- genes[!duplicated(genes$ENSEMBL),]
 y$genes <- genes
+dim(y)
+# [1] 27413   147
 
 # assign healthy and control samples
 y$samples$diseaseStatus[grep("Controls", colnames(y))]="control"
@@ -161,6 +164,11 @@ for (name in covariate.names) {
   legend(x="bottomright", bty="n", col=1:length(levels(get(name))), legend=levels, lty=1, lwd=2)
 }
 dev.off
+
+# save unfiltered counts file
+saveRDS(y$counts, file = paste0(outputdir, "unfiltered_counts.rds"))
+# save whole DGE list object as output for downstream analysis
+save(y, file = paste0(outputdir, "unfiltered_DGElistObject.Rda"))
 
 # Data pre-processing ------------------------------------------------------------------------
 

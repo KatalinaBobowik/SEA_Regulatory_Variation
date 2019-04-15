@@ -36,6 +36,7 @@ wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467
 palette(c(wes, brewer.pal(8,"Dark2")))
 # set up colour palette for batch
 batch.col=electronic_night(n=3)
+dev.off()
 
 # BEGIN ANALYSIS -------------------------------------------------------------------------------------------------
 
