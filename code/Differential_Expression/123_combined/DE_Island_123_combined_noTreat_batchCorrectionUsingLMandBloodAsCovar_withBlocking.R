@@ -113,29 +113,35 @@ dev.off()
 # Using duplicate correlation and blocking -----------------------------------------------------
 
 # First, we need to perform voom normalisation
-v <- voom(y, design, plot=F)
+v <- voom(y, design, plot=T)
 
 # create a new variable for blocking using sample IDs
-y$samples$ind <- sapply(strsplit(as.character(y$samples$samples), "[_.]"), `[`, 1)
+# define sample names
+samplenames <- as.character(y$samples$samples)
+samplenames <- sub("([A-Z]{3})([0-9]{3})", "\\1-\\2", samplenames)
+samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
+
+y$samples$ind <- samplenames
 
 # Estimate the correlation between the replicates.
 # Information is borrowed by constraining the within-block corre-lations to be equal between genes and by using empirical Bayes methods to moderate the standarddeviations between genes 
 dupcor <- duplicateCorrelation(v, design, block=y$samples$ind)
 # The value dupcor$consensus estimates the average correlation within the blocks and should be positive
 dupcor$consensus # sanity check
-# [1] 0.6511448
+# [1] 0.6796663
 median(v$weights) # another sanity check:
-# [1] 22.8338
+# [1]  22.8338
 
 # run voom a second time with the blocking variable and estimated correlation
 # The  vector y$samples$ind indicates the  two  blocks  corresponding  to  biological  replicates
 pdf(paste0(outputdir,"Limma_voomDuplicateCorrelation_TMMNormalisation.pdf"), height=8, width=12)
+par(mfrow=c(1,2))
 vDup <- voom(y, design, plot=TRUE, block=y$samples$ind, correlation=dupcor$consensus)
 dupcor <- duplicateCorrelation(vDup, design, block=y$samples$ind) # get warning message: Too much damping - convergence tolerance not achievable
 dupcor$consensus # sanity check pt 2
-# [1] 0.6511448
+# [1]  0.6796721
 median(vDup$weights) # another sanity check, pt 2 
-# [1] 22.67414
+# [1] 22.41583
 
 # With duplicate correction and blocking:
 # the inter-subject correlation is input into the linear model fit
@@ -154,26 +160,26 @@ voomDupTopTableMTW.MPI <- topTable(voomDupEfit, coef=3, p.value=0.01, n=Inf, sor
 # get number of DE genes at differnet thresholds
 # noLFC
 summary(decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01))
-#           SMBvsMTW SMBvsMPI MTWvsMPI
-#Down        930     2511     2134
-#NotSig    11352     8180     8817
-#Up          693     2284     2024
+#       SMBvsMTW SMBvsMPI MTWvsMPI
+#Down        898     2325     2102
+#NotSig    11430     8479     8887
+#Up          647     2171     1986
 write.table(decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01), file=paste0(outputdir,"numberDEgens_adjustmethodBH_noLFC_pval01.txt"))
 
 # LFC of 0.5
 summary(decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=0.5))
 #       SMBvsMTW SMBvsMPI MTWvsMPI
-#Down        105      663      545
-#NotSig    12634    11479    11943
-#Up          236      833      487
+#Down         96      606      536
+#NotSig    12661    11577    11958
+#Up          218      792      481
 write.table(decideTests(voomDupEfit,method="separate", adjust.method = "BH", p.value = 0.01, lfc=0.5), file=paste0(outputdir,"numberDEgens_adjustmethodBH_LFC05_pval01.txt"))
 
 # LFC of 1
 summary(decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=1))
 #       SMBvsMTW SMBvsMPI MTWvsMPI
-#Down          5       95       98
-#NotSig    12935    12641    12742
-#Up           35      239      135
+#Down          6       87       96
+#NotSig    12940    12662    12748
+#Up           29      226      131
 write.table(decideTests(voomDupEfit,method="separate", adjust.method = "BH", p.value = 0.01, lfc=1), file=paste0(outputdir,"numberDEgens_adjustmethodBH_LFC1_pval01.txt"))
 
 

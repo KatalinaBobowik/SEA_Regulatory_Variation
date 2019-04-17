@@ -1,87 +1,109 @@
 # script created by KSB, 06.06.18
 # Perform DE analysing using RUVs vs a traditional linear modelling approach
 
-# load dependencies: libraries, human count data, plasmodium data, and data preprocessing
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/countData_123_combined.R")
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/dataPreprocessing_123_combined.R")
 
-# set working directory
-setwd("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/batchRemoval/RUVvsLinearModel")
+# Load dependencies and set input paths --------------------------
+
+# Load dependencies:
+library(edgeR)
+library(plyr)
 library(NineteenEightyR)
+library(RColorBrewer)
+library(biomaRt)
+library(ggpubr)
+library(ggplot2)
+library(ggsignif)
+library(pheatmap)
+library(viridis)
+library(gplots)
+library(circlize)
+library(ComplexHeatmap)
+library(Homo.sapiens)
 require(VennDiagram)
 library(gridExtra)
 library(grid)
 library(ggplot2)
 library(lattice)
 library(eulerr)
+library(reshape2)
 
-## setup ---------------------------------------
+# Set paths:
+inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/"
 
-colors <- electronic_night(n=5)
-# identify which samples are replicated
+# Set output directory and create it if it does not exist:
+outputdir <- "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/batchRemoval/RUVvsLinearModel/"
+
+if (file.exists(outputdir) == FALSE){
+    dir.create(outputdir)
+}
+
+# set up colour palette. The "wes" palette will be used for island and other statistical information, whereas NineteenEightyR will be used for batch information
+wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467","#5B1A18")
+palette(c(wes, brewer.pal(8,"Dark2")))
+# set up colour palette for batch
+batch.col=electronic_night(n=3)
+dev.off()
+
+
+# Begin Analysis --------------------------------------------------------------------------------------------------
+
+# Load the RUVs-corrected set1 object
+load(paste0(inputdir, "RUVs_Setup/set1_RUVsCorrectedObject.Rda"))
+# load the filtered, normalised y DGE list object
+load(paste0(inputdir, "dataPreprocessing/indoRNA.read_counts.TMM.filtered.Rda"))
+# lcpm
+load(paste0(inputdir, "dataPreprocessing/indoRNA.logCPM.TMM.filtered.Rda"))
+
+# define sample names
+samplenames <- as.character(y$samples$samples)
+samplenames <- sub("([A-Z]{3})([0-9]{3})", "\\1-\\2", samplenames)
+samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
+
+# define variables
+batch=y$samples$batch
+Island=y$samples$Island
+
+# get which samples are replicates
+load(paste0(inputdir, "dataPreprocessing/covariates.Rda"))
+allreps=covariates[,1][which(covariates$replicate)]
+allreps=unique(allreps)
 allreplicated=as.factor(samplenames %in% allreps)
 
-# First, construct a matrix specifying the replicates. 
-replicates=matrix(-1, nrow=length(allreps), ncol=3)
-rownames(replicates)=unique(samplenames[samplenames %in% allreps])
-for (i in 1:nrow(replicates)){
-    replicates[i,1:length(grep(rownames(replicates)[i], samplenames))] = grep(rownames(replicates)[i], samplenames)
-}
-genes <- rownames(y)
+# get which samples are replicates - we need this information to label replicates in the PCA plots
+allreplicated=as.factor(samplenames %in% allreps)
 
 ## RUVs ----------------------------------------
 
-# First, set up pheno data with all known factors of unwanted variation
-set <- newSeqExpressionSet(as.matrix(y$counts), phenoData = data.frame(Island, row.names=colnames(y)))
-# normalise with upper quartile normalisation
-set <- betweenLaneNormalization(set, which="upper")
-set1 <- RUVs(set, genes, k=5, replicates)
+# load z, the normalised count matrix
+load(paste0(inputdir, "DE_Island/RUVs/z_UQNormalised.Rda"))
 
-# create design matrix
+# create a new variable for blocking using sample IDs
+z$samples$ind <- samplenames
+
+# setup RUV design
 design.RUV <- model.matrix(~0 + Island + W_1 + W_2 + W_3 + W_4 + W_5, data=pData(set1))
 colnames(design.RUV)=gsub("Island", "", colnames(design.RUV))
 colnames(design.RUV)[3]="Mappi"
-z <- DGEList(counts=counts(set1), group=Island)
-z <- calcNormFactors(z, method="upperquartile")
-
-# set up gene names
-geneid <- rownames(z)
-genes <- select(Homo.sapiens, keys=geneid, columns=c("SYMBOL", "TXCHROM"), keytype="ENSEMBL")
-# Check for and remove duplicated gene IDs, then add genes dataframe to DGEList object
-genes <- genes[!duplicated(genes$ENSEMBL),]
-z$genes <- genes
-
-# make contrast matrix
 contr.matrix.RUVs <- makeContrasts(SMBvsMTW=Sumba - Mentawai, SMBvsMPI=Sumba - Mappi, MTWvsMPI=Mentawai - Mappi, levels=colnames(design.RUV))
 v.RUV <- voom(z, design.RUV, plot=FALSE)
+dupcor <- duplicateCorrelation(v.RUV, design.RUV, block=z$samples$ind)
+# run voom a second time
+vDup <- voom(z, design.RUV, plot=TRUE, block=z$samples$ind, correlation=dupcor$consensus)
+dupcor <- duplicateCorrelation(vDup, design.RUV, block=z$samples$ind) # get warning message: Too much damping - convergence tolerance not achievable
+
 # fit linear models
-vfit.RUV <- lmFit(v.RUV, design.RUV)
-vfit.RUV <- contrasts.fit(vfit.RUV, contrasts=contr.matrix.RUVs)
-efit.RUV <- eBayes(vfit.RUV)
+voomDupVfit <- lmFit(vDup, design.RUV, block=z$samples$ind, correlation=dupcor$consensus)
+voomDupVfit <- contrasts.fit(voomDupVfit, contrasts=contr.matrix.RUVs)
+efit.RUV <- eBayes(voomDupVfit, robust=T)
+
 # for now, we'll continue sticking with a k of 5. Let's see how many DE genes we get setting a lfc of 1 and 0.01 pvalue
 dt <- decideTests(efit.RUV, p.value=0.01, lfc=1)
 summary(dt)
 
 #       SMBvsMTW SMBvsMPI MTWvsMPI
-# Down          6       33       43
-# NotSig    11450    11349    11332
-# Up           14       88       95
-
-# which genes are these?
-mycol <- colorpanel(1000,"blue","white","red")
-colors=c("steelblue","goldenrod1","red2")
-cc=colors[Island]
-pdf("topGenes_Heatmap_RUVs.pdf", height=15, width=15)
-for (i in 1:ncol(efit)){
-    topTable <- topTable(efit, coef=i, p.value=0.01, lfc=1, n=Inf)
-    if (nrow(topTable) > 0){
-        index <- which(v$genes$ENSEMBL %in% topTable$ENSEMBL[1:100])
-        heatmap.2(v$E[index,], scale="row",labRow=v$genes$SYMBOL[index], labCol=Island, col=mycol, trace="none", density.info="none", margin=c(8,6), lhei=c(2,10), dendrogram="column", ColSideColors=cc, keysize=1, cexRow=1.5, main=colnames(efit)[i])
-    }
-    # write out topTable genes for the whole gene list
-    write.table(topTable, file=paste0("topTable_",colnames(efit)[i],".txt"))
-}
-dev.off()
+#Down          8       58       87
+#NotSig    12939    12761    12729
+#Up           28      156      159
 
 
 # now let's do the same on a regular limma LM pipeline ----------------------------------------------------------------------------------------------------
@@ -92,26 +114,35 @@ design.lm <- model.matrix(~0 + Island + y$samples$Age + batch + y$samples$RIN + 
 colnames(design.lm)=gsub("Island", "", colnames(design.lm))
 #rename columns to exclude spaces and unrecognised characters
 colnames(design.lm)[c(3,4,7:13)]=c("Mappi","Age","RIN", "CD8T", "CD4T", "NK", "Bcell", "Mono", "Gran")
+
+# set up blocking identifiers
+y$samples$ind <- samplenames
+
 # set up contrast matrix using nested design
 contr.matrix.limma <- makeContrasts(SMBvsMTW=Sumba - Mentawai, SMBvsMPI=Sumba - Mappi, MTWvsMPI=Mentawai - Mappi, levels=colnames(design.lm))
 v.lm <- voom(y, design.lm, plot=FALSE)
+dupcor <- duplicateCorrelation(v.lm, design.lm, block=y$samples$ind)
+vDup.lm <- voom(y, design.lm, plot=TRUE, block=y$samples$ind, correlation=dupcor$consensus)
+dupcor <- duplicateCorrelation(vDup.lm, design.lm, block=y$samples$ind) # get warning message: Too much damping - convergence tolerance not achievable
+
 # fit linear models
-vfit.lm <- lmFit(v.lm, design.lm)
+vfit.lm <- lmFit(vDup.lm, design.lm, block=y$samples$ind, correlation=dupcor$consensus)
 vfit.lm <- contrasts.fit(vfit.lm, contrasts=contr.matrix.limma)
-efit.lm <- eBayes(vfit.lm)
+efit.lm <- eBayes(vfit.lm, robust=T)
+
 dt.lm <- decideTests(efit.lm, p.value=0.01, lfc=1)
 summary(dt.lm)
 
 #       SMBvsMTW SMBvsMPI MTWvsMPI
-# Down          1       60       63
-# NotSig    11455    11273    11309
-# Up           14      137       98
+#Down          6       87       96
+#NotSig    12940    12662    12748
+#Up           29      226      131
 
 
 # LM vs RUV similiarities --------------------------------
 
 # Get which genes overlap between RUVs and linear model
-pdf("VennDiagram_LMvsRUVsComparison.pdf", height=4, width=12)
+pdf(paste0(outputdir,"VennDiagram_LMvsRUVsComparison.pdf"), height=4, width=12)
 # sapply(1:3, function(x) vennDiagram(cbind(dt[,x],dt.lm[,x]), circle.col=c("red","blue"), names=c("RUVs", "LinearModel"), main=colnames(dt.lm)[x]))
 par(mfrow=  c(1,3),mar = c(0,0,0,0)) 
 for (x in c(1:3)){
@@ -124,7 +155,7 @@ for (i in 1:3){
 	commonGenes=dt[,i] & dt.lm[,i]
 	commonGenes=which(commonGenes == TRUE)
 	commonGenes.results <- getBM(attributes = c('ensembl_gene_id', 'external_gene_name'), mart = ensembl.mart.90,values=names(commonGenes), filters="ensembl_gene_id")
-	write.table(commonGenes.results,file=paste0("allCommonGenes_",colnames(dt)[i],".txt"))
+	write.table(commonGenes.results,file=paste0(outputdir,"allCommonGenes_",colnames(dt)[i],".txt"))
 }
 
 # test top genes -----------------------------------
@@ -139,7 +170,7 @@ load(url("http://bioinf.wehi.edu.au/software/MSigDB/human_c2_v5p2.rdata"))
 idx <- ids2indices(Hs.c2,id=y$entrezID) 
 
 # analysis of top gene pathways through Camera
-pdf("Top10CameraGeneSets_VennDiagram.pdf", height=12, width=14)
+pdf(paste0(outputdir,"Top10CameraGeneSets_VennDiagram.pdf"), height=12, width=14)
 for (i in 1:3){
     camera.lm.matrix=camera(v.lm,idx,design.lm,contrast=contr.matrix.limma[,i])
     camera.RUV.matrix=camera(v.RUV,idx,design.RUV,contrast=contr.matrix.RUVs[,i])
@@ -148,10 +179,10 @@ for (i in 1:3){
     intersect=length(intersect(LM, RUV))
     fit2 <- euler(c(LM=length(LM)-intersect,RUV=length(RUV)-intersect,"LM&RUV"=intersect))
     assign(colnames(efit.lm)[i],plot(fit2, fills = c("dodgerblue4","darkgoldenrod1"),edges = FALSE,fontsize = 8,quantities = list(fontsize = 10, col="white"), alpha=0.8, main=colnames(efit.lm)[i], cex=1, counts=T))
-    write.table(camera.lm.matrix, file=paste0("CAMERA_LM_",colnames(efit)[i],".txt"))
-    write.table(camera.lm.matrix, file=paste0("CAMERA_RUV_",colnames(efit)[i],".txt"))
+    write.table(camera.lm.matrix, file=paste0(outputdir,"CAMERA_LM_",colnames(efit.lm)[i],".txt"))
+    write.table(camera.lm.matrix, file=paste0(outputdir,"CAMERA_RUV_",colnames(efit.lm)[i],".txt"))
 }
-grid.arrange(SMBvsMTW, SMBvsMPI, MTWvsMPI, ncol=3, widths=c(1.3,1.1,1))
+grid.arrange(SMBvsMTW, SMBvsMPI, MTWvsMPI, ncol=3, widths=c(1.1,1,1.1))
 # you can also plot this with cowplot: plot_grid(SMBvsMTW, SMBvsMPI, MTWvsMPI,rel_heights = c(1/2, 1/4, 1/4), align="h", ncol=3). Source: https://stackoverflow.com/questions/36198451/specify-widths-and-heights-of-plots-with-grid-arrange
 dev.off()
 
@@ -165,7 +196,7 @@ for (i in 1:3){
     fit2 <- euler(c(LM=length(LM)-intersect,RUV=length(RUV)-intersect,"LM&RUV"=intersect))
     assign(colnames(efit.lm)[i],plot(fit2, fills = c("dodgerblue4","darkgoldenrod1"),edges = FALSE,fontsize = 8,quantities = list(fontsize = 10, col="white"), alpha=0.8, main=colnames(efit.lm)[i], cex=1, counts=T))
 }
-grid.arrange(SMBvsMTW, SMBvsMPI, MTWvsMPI, ncol=3, widths=c(1.3,1.1,1))
+grid.arrange(SMBvsMTW, SMBvsMPI, MTWvsMPI, ncol=3, widths=c(1.1,1,1))
 
 # plot pca and associations of both -------------------------------------------
 
@@ -216,7 +247,20 @@ pc.assoc <- function(pca.data){
 }
 
 # Prepare covariate matrix
-all.covars.df <- y$samples[,c(3,5:22)] 
+# assign covariate names
+# subtract variables we don't need
+subtract=c("group", "norm.factors", "samples")
+# get index of unwanted variables
+subtract=which(colnames(y$samples) %in% subtract)
+covariate.names = colnames(y$samples)[-subtract]
+for (name in covariate.names){
+ assign(name, y$samples[[paste0(name)]])
+}
+
+# get rid of covariates we aren't interested in
+covariate.names=covariate.names[grep("lib.size|ID|microscopy.pos|PCR.pos|fract.pfpx.reads|replicate|ind",covariate.names, invert=T)]
+# Prepare covariate matrix
+all.covars.df <- y$samples[,covariate.names]
 
 # Let's just look at the forst pca for now and make a function to do this (without any labels to make the visualisation of batch clear)
 one.dimension=function(data) {
@@ -227,7 +271,7 @@ one.dimension=function(data) {
 }
 
 # Compare the first PCA of the LM-corrected method to the RUVs corrected method
-pdf("PCA_RUVvsLM_FirstDimension.pdf", height=8, width=15)
+pdf(paste0(outputdir,"PCA_RUVvsLM_FirstDimension.pdf"), height=8, width=15)
 par(mfrow=c(1,2))
 one.dimension(batch.corrected.lcpm)
 title("Limma-LM")
@@ -239,28 +283,29 @@ dev.off()
 # We also want to look at a heatmap of the significant covariates compared to each dimension of the PCA
 
 # first for limma-corrected data
+name="batch"
 pcaresults.limma <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=batch.col[as.numeric(batch)],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=batch)
 all.pcs.limma <- pc.assoc(pcaresults.limma)
 all.pcs.limma$Variance <- pcaresults.limma$sdev^2/sum(pcaresults.limma$sdev^2)
 # we can save the table to look at the association in all of the dimensions
-write.table(all.pcs.limma, file="PC_associations_limmaCorrectedData.txt")
+write.table(all.pcs.limma, file=paste0(outputdir,"PC_associations_limmaCorrectedData.txt"))
 
 # now for the RUVs-corrected data
 pcaresults.RUVs <- plot.pca(dataToPca=cpm(normCounts(set1), log=T), speciesCol=batch.col[as.numeric(batch)],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=batch)
 all.pcs.RUVs <- pc.assoc(pcaresults.RUVs)
 all.pcs.RUVs$Variance <- pcaresults.RUVs$sdev^2/sum(pcaresults.RUVs$sdev^2)
 # save the associations for the RUVs data
-write.table(all.pcs.RUVs, file="PC_associations_RUVsCorrectedData.txt")
+write.table(all.pcs.RUVs, file=paste0(outputdir,"PC_associations_RUVsCorrectedData.txt"))
 
 # set up heatmap information
 # first limma
-limma.pc=all.pcs.limma[1:5,c(3:20)]
+limma.pc=all.pcs.limma[1:5,covariate.names]
 limma.hm=melt(limma.pc)
 limma.hm$Dimension=rep(1:5,ncol(limma.pc))
 colnames(limma.hm)[c(1,2)]=c("Covariate","Association")
 
 # RUVs
-RUV.pc=all.pcs.RUVs[1:5,c(3:20)]
+RUV.pc=all.pcs.RUVs[1:5,covariate.names]
 RUV.hm=melt(RUV.pc)
 RUV.hm$Dimension=rep(1:5,ncol(RUV.pc))
 colnames(RUV.hm)[c(1,2)]=c("Covariate","Association")
@@ -271,13 +316,13 @@ hm.palette <- colorRampPalette(rev(brewer.pal(9, 'YlOrRd')), space='Lab')
 limma=ggplot(data = limma.hm, aes(x = Covariate, y = Dimension)) + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("Limma") 
 RUV=ggplot(data = RUV.hm, aes(x = Covariate, y = Dimension)) + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("RUVs") 
 # use ggarange to plot both heatmpas
-pdf("Heatmap_SigCovar_RUVvsLM.pdf", height=7, width=15)
+pdf(paste0(outputdir,"Heatmap_SigCovar_RUVvsLM.pdf"), height=7, width=15)
 ggarrange(limma,RUV)
 dev.off()
 
 # Compare p-value distributions of both -----------------------------------------------
 
-pdf("VolcanoPlot_RUVvsLM.pdf", height=10, width=15)
+pdf(paste0(outputdir,"VolcanoPlot_RUVvsLM.pdf"), height=10, width=15)
 layout(matrix(c(1,2,3,4,5,6), nrow=3,byrow = F))
 for (i in 1:ncol(efit.lm)){
     plot(efit.lm$coef[,i], -log10(as.matrix(efit.lm$p.value)[,i]), pch=20, main=paste("LM",colnames(efit)[i],sep="\n"), xlab="log2FoldChange", ylab="-log10(pvalue)")
@@ -295,15 +340,12 @@ dev.off()
 
 # See which genes are not in common and why ----------------------------------------------------------------------
 
-# reset wd to keep things organised
-setwd("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/DE_Island/LMvsRUVs_allCommonGenes")
-
 # set up not in function
 '%!in%' <- function(x,y)!('%in%'(x,y))
 
 # see which genes aren't common and why this might be
-pdf("genesNotInCommon_RUVsVsLM.pdf", height=10, width=15)
-for (i in 1:ncol(efit)){
+pdf(paste0(outputdir,"genesNotInCommon_RUVsVsLM.pdf"), height=10, width=15)
+for (i in 1:ncol(efit.lm)){
     RUVs=dt[,i][which(abs(dt[,i])==T)]
     lm=dt.lm[,i][which(abs(dt.lm[,i])==T)]
     notInLM=names(RUVs[which(names(RUVs) %!in% names(lm))])

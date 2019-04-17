@@ -1,23 +1,63 @@
-# script created by KSB, 08.08.18
-# Analyse batch correction by RUVs and set up data for downstream DE analysis
+# Load dependencies and set input paths --------------------------
 
-# setup ---------------------------------------------------------------------
+# Load dependencies:
+library(edgeR)
+library(plyr)
+library(NineteenEightyR)
+library(RColorBrewer)
+library(biomaRt)
+library(ggpubr)
+library(ggplot2)
+library(ggsignif)
+library(pheatmap)
+library(viridis)
+library(gplots)
+library(circlize)
+library(ComplexHeatmap)
+library(Homo.sapiens)
+library(RUVSeq)
 
-# load dependencies: libraries, human count data and data preprocessing
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/countData_123_combined.R")
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/dataPreprocessing_123_combined.R")
 
-# set working directory
-setwd("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/RUVs_Setup")
+# Set paths:
+inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/"
+housekeepingdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/BatchEffects/"
+# Set output directory and create it if it does not exist:
+outputdir <- "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/RUVs_Setup/"
 
-# set up colors
-colors <- electronic_night(n=5)
+if (file.exists(outputdir) == FALSE){
+    dir.create(outputdir)
+}
+
+# set up colour palette. The "wes" palette will be used for island and other statistical information, whereas NineteenEightyR will be used for batch information
+wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467","#5B1A18")
+palette(c(wes, brewer.pal(8,"Dark2")))
+# set up colour palette for batch
+batch.col=electronic_night(n=3)
 lightcolors=c("thistle", "darkblue")
+dev.off()
 
-# identify which samples are replicated
+# Begin Analysis --------------------------------------------------------------------------------------------------
+
+# load the filtered, normalised y DGE list object
+load(paste0(inputdir, "dataPreprocessing/indoRNA.read_counts.TMM.filtered.Rda"))
+
+# define sample names
+samplenames <- as.character(y$samples$samples)
+samplenames <- sub("([A-Z]{3})([0-9]{3})", "\\1-\\2", samplenames)
+samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
+
+# define variables
+batch=y$samples$batch
+Island=y$samples$Island
+
+# get which samples are replicates
+load(paste0(inputdir, "dataPreprocessing/covariates.Rda"))
+allreps=covariates[,1][which(covariates$replicate)]
+allreps=unique(allreps)
 allreplicated=as.factor(samplenames %in% allreps)
 
-# exploratory analysis -----------------------------------------------------------------
+# get which samples are replicates - we need this information to label replicates in the PCA plots
+allreplicated=as.factor(samplenames %in% allreps)
 
 # RUVSeq works with a genes-by-samples numeric matrix or a SeqExpressionSet object containing read counts. Let's set up a SeqExpressionSet with our counts matrix
 set <- newSeqExpressionSet(as.matrix(y$counts), phenoData = data.frame(Island, row.names=colnames(y)))
@@ -37,24 +77,22 @@ hackedPCA=function(object,pc1,pc2,pch,color){
 
 # Normalisation can be performed using "median","upper", or "full", however when passing to edgeR's normalisation method (below), the only options are "TMM","RLE", and "upperquartile". In order to keep consistency, we'll go ahead and choose the "upper" method, since it's in both.
 # check normalisation before and after performing upper qiuartile normalisation
-pdf("Normalisation_beforeandAfterUQnorm.pdf", height=15, width=15)
+pdf(paste0(outputdir,"Normalisation_beforeandAfterUQnorm.pdf"), height=15, width=15)
 par(mfrow=c(2,2))
-plotRLE(set, outline=FALSE, ylim=c(-2,2), col=colors[batch], xaxt='n', main="No Normalisation")
-legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(colors[as.numeric(batch)]))
+plotRLE(set, outline=FALSE, ylim=c(-2,2), col=batch.col[batch], xaxt='n', main="No Normalisation")
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col))
 # get PCA of batch and check how closely replictes sit to one another
-hackedPCA(object=counts(set), pc1=1, pc2=2, pch=as.numeric(allreplicated)+15, col=colors[batch])
+hackedPCA(object=counts(set), pc1=1, pc2=2, pch=as.numeric(allreplicated)+15, col=batch.col[batch])
 title("No Normalisation")
-legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(colors[batch]))
-legend(legend=c("No", "Yes"), "bottomright", pch=c(17,18), title="Replicate", cex=0.6, border=F, bty="n", col=colors[3])
+legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col))
 
 # normalise with UQ normalisation
 set <- betweenLaneNormalization(set, which="upper")
-plotRLE(set, outline=FALSE, col=colors[batch], xaxt='n', main="Upper Quartile Normalisation", ylim=c(-2, 2))
-legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(colors[as.numeric(batch)]))
-hackedPCA(object=normCounts(set), pc1=1, pc2=2, pch=as.numeric(allreplicated)+15, col=colors[batch])
+plotRLE(set, outline=FALSE, col=batch.col[batch], xaxt='n', main="Upper Quartile Normalisation", ylim=c(-2, 2))
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col[as.numeric(batch)]))
+hackedPCA(object=normCounts(set), pc1=1, pc2=2, pch=as.numeric(allreplicated)+15, col=batch.col[batch])
 title("Upper Quartile Normalisation")
-legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(colors[batch]))
-legend(legend=c("No", "Yes"), "bottomright", pch=c(17,18), title="Replicate", cex=0.6, border=F, bty="n", col=colors[3])
+legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col))
 dev.off()
 
 
@@ -70,7 +108,7 @@ for (i in 1:nrow(replicates)){
 genes <- rownames(y)
 
 # explore which value of k is the best by looking at variation in RLE and PCA plots
-pdf("RUVsNormalisation_choosingK.pdf", height=15, width=12)
+pdf(paste0(outputdir,"RUVsNormalisation_choosingK.pdf"), height=15, width=12)
 par(mar=c(4.1,4.1,3.1,1.1), mfrow=c(6,2))
 for (i in c(1:6)){
     set1 <- RUVs(set, genes, k=i, replicates)
@@ -83,7 +121,7 @@ dev.off()
 
 
 # Set up list of housekeeping genes as controls (from Eisenberg and Levanon, 2003) for volcano plots
-housekeeping=read.table("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/BatchEffects/Housekeeping_ControlGenes.txt", as.is=T, header=F)
+housekeeping=read.table(paste0(housekeepingdir,"Housekeeping_ControlGenes.txt"), as.is=T, header=F)
 # if this is broken, use host = "uswest.ensembl.org"
 ensembl.mart.90 <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset='hsapiens_gene_ensembl', host = 'www.ensembl.org', ensemblRedirect = FALSE)
 biomart.results.table <- getBM(attributes = c('ensembl_gene_id', 'external_gene_name'), mart = ensembl.mart.90,values=housekeeping, filters="hgnc_symbol")
@@ -96,7 +134,7 @@ k=vector()
 allGenes=list()
 for (j in 1:3){
     counter=0
-    pdf(paste0("pvalueDist_choosingK_RUVs_",j,".pdf"))
+    pdf(paste0(outputdir,"pvalueDist_choosingK_RUVs_",j,".pdf"))
     for (i in c(1:6)){
         counter=counter+1
         set1 <- RUVs(set, genes, k=i, replicates)
@@ -130,7 +168,7 @@ for (j in 1:3){
 }
 
 # plot the number of DE genes for all population comparisons and all varying degrees of k
-pdf("numberDeGenes_choosingK_RUVs_.pdf", height=5, width=15)
+pdf(paste0(outputdir,"numberDeGenes_choosingK_RUVs_.pdf"), height=5, width=15)
 par(mfrow=c(1,3))
 for (i in c(1:3)){
     plot(k, allGenes[[i]], main=names(allGenes)[i], ylab="n DE Genes")
@@ -143,11 +181,38 @@ dev.off()
 set1 <- RUVs(set, genes, k=5, replicates)
 
 # write table of values of k, the unwnated factors of variation
-write.table(pData(set1), file="RUVs_unwantedFactorsOfVariation_Table.txt", quote=F, sep="\t")
+write.table(pData(set1), file=paste0(outputdir,"RUVs_unwantedFactorsOfVariation_Table.txt"), quote=F, sep="\t")
+# save the set1 object
+save(set1, file = paste0(outputdir, "set1_RUVsCorrectedObject.Rda"))
 
 # now plot all of the covariates and see how the batch correction worked
-# rename column names of lcpm
-colnames(lcpm)=samplenames
+
+# assign covariate names
+# subtract variables we don't need
+subtract=c("group", "norm.factors", "samples")
+# get index of unwanted variables
+subtract=which(colnames(y$samples) %in% subtract)
+covariate.names = colnames(y$samples)[-subtract]
+for (name in covariate.names){
+ assign(name, y$samples[[paste0(name)]])
+}
+
+# Age, RIN, and library size need to be broken up into chunks for easier visualisation of trends (for instance in Age, we want to see high age vs low age rather than the effect of every single age variable)
+for (name in c("Age","RIN","lib.size")){
+  assign(name, cut(as.numeric(as.character(y$samples[[paste0(name)]])), breaks=5))
+}
+
+# assign names to covariate names so you can grab individual elements by name
+names(covariate.names)=covariate.names
+
+# assign factor variables
+factorVariables=c(colnames(Filter(is.factor,y$samples))[which(colnames(Filter(is.factor,y$samples)) %in% covariate.names)], "Age", "lib.size", "RIN")
+numericVariables=colnames(Filter(is.numeric,y$samples))[which(colnames(Filter(is.numeric,y$samples)) %in% covariate.names)] %>% subset(., !(. %in% factorVariables))
+
+# get rid of covariates we aren't interested in
+covariate.names=covariate.names[grep("lib.size|ID|microscopy.pos|PCR.pos|fract.pfpx.reads|replicate",covariate.names, invert=T)]
+# Prepare covariate matrix
+all.covars.df <- y$samples[,covariate.names]
 
 # PCA plotting function
 plot.pca <- function(dataToPca, speciesCol, namesPch, sampleNames){
@@ -185,33 +250,30 @@ pc.assoc <- function(pca.data){
     return (all.pcs)
 }
 
-# Prepare covariate matrix
-all.covars.df <- y$samples[,c(3,5:22)] 
-
 # Plot PCA
-for (name in covariate.names[c(1:10,17:18)]){
+for (name in factorVariables){
   if (nlevels(get(name)) < 26){
-    pdf(paste0("pcaresults_",name,".pdf"))
+    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
     pcaresults <- plot.pca(dataToPca=cpm(normCounts(set1), log=T), speciesCol=as.numeric(get(name)),namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
     dev.off()
   } else {
-    pdf(paste0("pcaresults_",name,".pdf"))
+    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
     pcaresults <- plot.pca(dataToPca=cpm(normCounts(set1), log=T), speciesCol=as.numeric(get(name)),namesPch=20,sampleNames=get(name))
     dev.off()
   }
 }
 
 # plot batch
-pdf(paste0("pcaresults_batch.pdf"))
+pdf(paste0(outputdir,"pcaresults_batch.pdf"))
 name="batch"
 pcaresults <- plot.pca(dataToPca=cpm(normCounts(set1), log=T), speciesCol=batch.col[as.numeric(batch)],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=batch)
 dev.off()
   
 # plot blood
-for (name in covariate.names[c(11:16)]){
+for (name in numericVariables){
     initial <- cut(get(name), breaks = seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
     bloodCol <- colorRampPalette(c("blue", "red"))(79)[initial]
-    pdf(paste0("pcaresults_",name,".pdf"))
+    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
     pcaresults <- plot.pca(dataToPca=cpm(normCounts(set1), log=T), speciesCol=bloodCol,namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
     dev.off()
 }
@@ -222,13 +284,9 @@ all.pcs <- pc.assoc(pcaresults)
 all.pcs$Variance <- pcaresults$sdev^2/sum(pcaresults$sdev^2)
 
 # plot pca covariates association matrix to illustrate any potential confounding and evidence for batches
-pdf("significantCovariates_AnovaHeatmap.pdf")
-pheatmap(all.pcs[1:5,c(3:20)], cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
+pdf(paste0(outputdir,"significantCovariates_AnovaHeatmap.pdf"))
+pheatmap(all.pcs[1:5,covariate.names], cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
 dev.off()
 
 # Write out the covariates:
-write.table(all.pcs, file="pca_covariates_blood.txt", col.names=T, row.names=F, quote=F, sep="\t")
-
-
-
-
+write.table(all.pcs, file=paste0(outputdir,"pca_covariates_blood.txt"), col.names=T, row.names=F, quote=F, sep="\t")

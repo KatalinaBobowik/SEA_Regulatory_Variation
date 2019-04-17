@@ -25,7 +25,7 @@ library(car)
 library(sva)
 
 # Set paths:
-inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
+inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined  "
 
 # Set output directory and create it if it does not exist:
 outputdir <- "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataExploration/"
@@ -146,7 +146,7 @@ pc.assoc <- function(pca.data){
 }
 
 # get rid of covariates we aren't interested in
-covariate.names=covariate.names[grep("lib.size|ID|microscopy.po|PCR.pos|fract.pfpx.reads|replicate",covariate.names, invert=T)]
+covariate.names=covariate.names[grep("lib.size|ID|microscopy.pos|PCR.pos|fract.pfpx.reads|replicate",covariate.names, invert=T)]
 # Prepare covariate matrix
 all.covars.df <- y$samples[,covariate.names]
 
