@@ -13,13 +13,13 @@ library(edgeR)
 library(magrittr)
 library(RUVSeq)
 library(Homo.sapiens)
-library(ggubr)
+library(ggpubr)
 
 # Set paths:
-inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
+inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/"
 outputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/batchRemoval/RUVvsLinearModel/"
 # Load the DGE list object. y:
-load(paste0(inputdir, "indoRNA.read_counts.TMM.filtered.Rda"))
+load(paste0(inputdir, "dataPreprocessing/indoRNA.read_counts.TMM.filtered.Rda"))
 
 # set up parallel processing
 cl <- makeCluster(4)
@@ -33,7 +33,23 @@ y$samples$Age[which(is.na(y$samples$Age) == T)]=45
 # set up design
 design <- model.matrix(~0 + y$samples$Island + y$samples$Age + y$samples$batch + y$samples$RIN + y$samples$CD8T + y$samples$CD4T + y$samples$NK + y$samples$Bcell + y$samples$Mono + y$samples$Gran)
 colnames(design)=gsub("Island", "", colnames(design)) %>% gsub("[\\y$]", "", .) %>% gsub("samples", "", .) %>% gsub("West Papua", "Mappi", .)
+# First pass of voom
 v <- voom(y, design, plot=F)
+
+# create a new variable for blocking using sample IDs
+# define sample names
+samplenames <- as.character(y$samples$samples)
+samplenames <- sub("([A-Z]{3})([0-9]{3})", "\\1-\\2", samplenames)
+samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
+
+y$samples$ind <- samplenames
+
+# Estimate the correlation between the replicates.
+# Information is borrowed by constraining the within-block corre-lations to be equal between genes and by using empirical Bayes methods to moderate the standarddeviations between genes 
+dupcor <- duplicateCorrelation(v, design, block=y$samples$ind)
+
+# run voom a second time
+vDup <- voom(y, design, plot=TRUE, block=y$samples$ind, correlation=dupcor$consensus)
 
 # Specify variables to consider
 # Age is continuous so model it as a fixed effect. Individual and Tissue are both categorical, so model them as random effects.
@@ -47,7 +63,7 @@ form1 <- ~ Age + RIN + CD8T +  CD4T + NK + Bcell + Mono + Gran + (1|Island) + (1
 # 2) extract variance fractions from each model fit for each gene, the fraction of variation attributable
 # to each variable is returned
 # Interpretation: the variance explained by each variables after correcting for all other variables
-varPart1 <- fitExtractVarPartModel(v, form1, y$samples)
+varPart1 <- fitExtractVarPartModel(vDup, form1, y$samples)
 
 # sort variables (i.e. columns) by median fraction of variance explained
 vp1 <- sortCols(varPart1)
@@ -60,67 +76,40 @@ write.table(summary(vp1), file=paste0(outputdir,"summary_lmModel_VariancePartiti
 
 # Now look at RUVs ----------------------------------------------------------------------------------------------------
 
-# identify which samples are replicated
-load(paste0(inputdir, "covariates.Rda"))
-allreps=covariates[,1][which(covariates$replicate)]
-allreps=unique(allreps)
-allreplicated=as.factor(samplenames %in% allreps)
+# load z, the normalised count matrix
+load(paste0(inputdir, "DE_Island/RUVs/z_UQNormalised.Rda"))
+# Load the RUVs-corrected set1 object
+load(paste0(inputdir, "RUVs_Setup/set1_RUVsCorrectedObject.Rda"))
 
-allreplicated=as.factor(samplenames %in% allreps)
-
-# define sample names
-samplenames <- as.character(y$samples$samples)
-samplenames <- sub("([A-Z]{3})([0-9]{3})", "\\1-\\2", samplenames)
-samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
-
-# construct a matrix specifying the replicates. 
-replicates=matrix(-1, nrow=length(allreps), ncol=3)
-rownames(replicates)=unique(samplenames[samplenames %in% allreps])
-for (i in 1:nrow(replicates)){
-    replicates[i,1:length(grep(rownames(replicates)[i], samplenames))] = grep(rownames(replicates)[i], samplenames)
-}
-genes <- rownames(y)
-
-# set up pheno data with all known factors of unwanted variation
-set <- newSeqExpressionSet(as.matrix(y$counts), phenoData = data.frame(y$samples$Island, row.names=colnames(y)))
-# normalise with upper quartile normalisation
-set <- betweenLaneNormalization(set, which="upper")
-set1 <- RUVs(set, genes, k=5, replicates)
+# create a new variable for blocking using sample IDs
+z$samples$ind <- samplenames
 
 # create design matrix
-design <- model.matrix(~0 + y.samples.Island + W_1 + W_2 + W_3 + W_4 + W_5, data=pData(set1))
-colnames(design)=gsub("y.samples.Island", "", colnames(design))
-colnames(design)=gsub("West Papua", "Mappi", colnames(design))
-
-z <- DGEList(counts=counts(set1), group=y$samples$Island)
-z <- calcNormFactors(z, method="upperquartile")
-
-# set up gene names
-geneid <- rownames(z)
-genes <- select(Homo.sapiens, keys=geneid, columns=c("SYMBOL", "TXCHROM"), keytype="ENSEMBL")
-# Check for and remove duplicated gene IDs, then add genes dataframe to DGEList object
-genes <- genes[!duplicated(genes$ENSEMBL),]
-z$genes <- genes
+design.RUV <- model.matrix(~0 + Island + W_1 + W_2 + W_3 + W_4 + W_5, data=pData(set1))
+colnames(design.RUV)=gsub("Island", "", colnames(design))
+colnames(design.RUV)=gsub("West Papua", "Mappi", colnames(design))
 
 # make contrast matrix
-contr.matrix <- makeContrasts(SMBvsMTW=Sumba - Mentawai, SMBvsMPI=Sumba - Mappi, MTWvsMPI=Mentawai - Mappi, levels=colnames(design))
-v.ruv <- voom(z, design, plot=FALSE, normalize.method = "cyclicloess")
+v.RUV <- voom(z, design.RUV, plot=FALSE)
+dupcor <- duplicateCorrelation(v.RUV, design.RUV, block=z$samples$ind)
+# run voom a second time
+vDup <- voom(z, design.RUV, plot=TRUE, block=z$samples$ind, correlation=dupcor$consensus)
 
 # Define formula
-form2 <- ~ W_1 + W_2 + W_3 + W_4 + W_5 + (1|y.samples.Island)
+form2 <- ~ W_1 + W_2 + W_3 + W_4 + W_5 + (1|Island)
 # fit modelf
-varPart2 <- fitExtractVarPartModel(v.ruv, form2, pData(set1))
+varPart2 <- fitExtractVarPartModel(v.RUV, form2, pData(set1))
 
 # sort variables (i.e. columns) by median fraction of variance explained
 vp2 <- sortCols(varPart2)
 
 # violin plot of contribution of each variable to total variance
 fig2=plotVarPart(vp2, main="RUVs")
-ggsave(file="totalVarianceContribution_RUVs_allVariables.pdf", fig2)
-write.table(summary(vp2), file="summary_RUVs_VariancePartition.txt")
+ggsave(file=paste0(outputdir,"totalVarianceContribution_RUVs_allVariables.pdf"), fig2)
+write.table(summary(vp2), file=paste0(outputdir,"summary_RUVs_VariancePartition.txt"))
 
 # Merge both and plot
-pdf(file="VarianceExplained_LMvsRUVs.pdf", height=10, width=15)
+pdf(file=paste0(outputdir,"VarianceExplained_LMvsRUVs.pdf"), height=10, width=15)
 ggarrange(fig, fig2, labels=c("A","B"))
 dev.off()
 

@@ -1,0 +1,23 @@
+\contentsline {chapter}{List of Figures}{iv}{chapter*.1}
+\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}
+\contentsline {section}{\numberline {1.1}Study group}{2}{section.1.1}
+\contentsline {section}{\numberline {1.2}Previous studies analysing regulatory variation outside of Europe}{3}{section.1.2}
+\contentsline {section}{\numberline {1.3}Project significance and Aims}{4}{section.1.3}
+\contentsline {chapter}{\numberline {2}Methods}{5}{chapter.2}
+\contentsline {section}{\numberline {2.1}Sample collection and quality control}{5}{section.2.1}
+\contentsline {section}{\numberline {2.2}Alignment and transcript quantification}{7}{section.2.2}
+\contentsline {section}{\numberline {2.3}Technical replicate analysis}{9}{section.2.3}
+\contentsline {section}{\numberline {2.4}Removal of lowly-expressed genes and data normalization}{11}{section.2.4}
+\contentsline {section}{\numberline {2.5}Sample variation analysis and data exploration}{13}{section.2.5}
+\contentsline {section}{\numberline {2.6}Differential expression analysis}{19}{section.2.6}
+\contentsline {section}{\numberline {2.7}RUVs}{20}{section.2.7}
+\contentsline {section}{\numberline {2.8}Comparing both}{26}{section.2.8}
+\contentsline {chapter}{\numberline {3}Results}{29}{chapter.3}
+\contentsline {section}{\numberline {3.1}Island structure is maintained in expression profiles}{29}{section.3.1}
+\contentsline {section}{\numberline {3.2}Most significantly DE genes are those compared to the Mappi population}{30}{section.3.2}
+\contentsline {section}{\numberline {3.3}Many DE genes are involved in the immune response}{34}{section.3.3}
+\contentsline {section}{\numberline {3.4}Gene set testing and pathway analysis}{37}{section.3.4}
+\contentsline {chapter}{\numberline {4}Discussion}{39}{chapter.4}
+\contentsline {chapter}{\numberline {5}Supplementary Information}{41}{chapter.5}
+\contentsline {section}{\numberline {5.1}Supplementary Figures}{41}{section.5.1}
+\contentsline {section}{\numberline {5.2}Supplementary Tables}{44}{section.5.2}

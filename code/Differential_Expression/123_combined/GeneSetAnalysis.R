@@ -137,7 +137,6 @@ ensembl_genes=rownames(y)
 entrez=getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id", "entrezgene", "description"),values= ensembl_genes,mart=ensembl.mart.90)
 v$genes$entrezID=entrez[match(rownames(y), entrez[,1]), 2]
 
-
 #subset voom object to contain only genes with an Entrez Gene ID
 v <- v[which(!is.na(v$genes$entrezID)),]
 v <- v[-c(which(duplicated(v$genes$entrezID))),]

@@ -29,6 +29,7 @@ library(reshape2)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/"
+housekeepingdir="/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/BatchEffects/"
 
 # Set output directory and create it if it does not exist:
 outputdir <- "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/batchRemoval/RUVvsLinearModel/"
@@ -151,6 +152,9 @@ for (x in c(1:3)){
 }
 dev.off()
 
+# define ensembl mart
+ensembl.mart.90 <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset='hsapiens_gene_ensembl', host = 'www.ensembl.org', ensemblRedirect = FALSE)
+
 for (i in 1:3){
 	commonGenes=dt[,i] & dt.lm[,i]
 	commonGenes=which(commonGenes == TRUE)
@@ -180,7 +184,7 @@ for (i in 1:3){
     fit2 <- euler(c(LM=length(LM)-intersect,RUV=length(RUV)-intersect,"LM&RUV"=intersect))
     assign(colnames(efit.lm)[i],plot(fit2, fills = c("dodgerblue4","darkgoldenrod1"),edges = FALSE,fontsize = 8,quantities = list(fontsize = 10, col="white"), alpha=0.8, main=colnames(efit.lm)[i], cex=1, counts=T))
     write.table(camera.lm.matrix, file=paste0(outputdir,"CAMERA_LM_",colnames(efit.lm)[i],".txt"))
-    write.table(camera.lm.matrix, file=paste0(outputdir,"CAMERA_RUV_",colnames(efit.lm)[i],".txt"))
+    write.table(camera.lm.matrix, file=paste0(outputdir,"CAMERA_RUV_",colnames(efit.RUV)[i],".txt"))
 }
 grid.arrange(SMBvsMTW, SMBvsMPI, MTWvsMPI, ncol=3, widths=c(1.1,1,1.1))
 # you can also plot this with cowplot: plot_grid(SMBvsMTW, SMBvsMPI, MTWvsMPI,rel_heights = c(1/2, 1/4, 1/4), align="h", ncol=3). Source: https://stackoverflow.com/questions/36198451/specify-widths-and-heights-of-plots-with-grid-arrange
@@ -188,8 +192,8 @@ dev.off()
 
 # look at the top genes using top table
 for (i in 1:3){
-    topTable.lm <- topTable(efit.RUV, coef=i, p.value=0.01, n=Inf, sort.by="P")
-    topTable.RUV <- topTable(efit.lm, coef=i, p.value=0.01, n=Inf, sort.by="P")
+    topTable.lm <- topTable(efit.lm, coef=i, p.value=0.01, n=Inf, sort.by="P")
+    topTable.RUV <- topTable(efit.RUV, coef=i, p.value=0.01, n=Inf, sort.by="P")
     LM=topTable.lm$SYMBOL[1:100]
     RUV=topTable.RUV$SYMBOL[1:100]
     intersect=length(intersect(LM, RUV))
@@ -303,35 +307,63 @@ limma.pc=all.pcs.limma[1:5,covariate.names]
 limma.hm=melt(limma.pc)
 limma.hm$Dimension=rep(1:5,ncol(limma.pc))
 colnames(limma.hm)[c(1,2)]=c("Covariate","Association")
+limma.hm$Association=log(limma.hm$Association)
 
 # RUVs
 RUV.pc=all.pcs.RUVs[1:5,covariate.names]
 RUV.hm=melt(RUV.pc)
 RUV.hm$Dimension=rep(1:5,ncol(RUV.pc))
 colnames(RUV.hm)[c(1,2)]=c("Covariate","Association")
+RUV.hm$Association=log(RUV.hm$Association)
 
 # set up colour palette
-hm.palette <- colorRampPalette(rev(brewer.pal(9, 'YlOrRd')), space='Lab')
+hm.palette <- colorRampPalette(brewer.pal(11, 'RdYlBu'), space='Lab')
 # Save output of both plots
-limma=ggplot(data = limma.hm, aes(x = Covariate, y = Dimension)) + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("Limma") 
-RUV=ggplot(data = RUV.hm, aes(x = Covariate, y = Dimension)) + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("RUVs") 
+limma=ggplot(data = limma.hm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("Limma") 
+RUV=ggplot(data = RUV.hm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("RUVs") 
 # use ggarange to plot both heatmpas
 pdf(paste0(outputdir,"Heatmap_SigCovar_RUVvsLM.pdf"), height=7, width=15)
 ggarrange(limma,RUV)
 dev.off()
 
+# Now set up heatmap information for just covariates in linear model (minus coavriate of interest, island)
+limma.pc.lm=limma.pc[,c("batch","Island", "Age","RIN","Gran","Bcell","CD4T","CD8T","NK","Mono")]
+limma.hm.lm=melt(limma.pc.lm)
+limma.hm.lm$Dimension=rep(1:5,ncol(limma.pc.lm))
+colnames(limma.hm.lm)[c(1,2)]=c("Covariate","Association")
+
+RUV.pc.lm=RUV.pc[,c("batch","Island","Age","RIN","Gran","Bcell","CD4T","CD8T","NK","Mono")]
+RUV.hm.lm=melt(RUV.pc.lm)
+RUV.hm.lm$Dimension=rep(1:5,ncol(RUV.pc.lm))
+colnames(RUV.hm.lm)[c(1,2)]=c("Covariate","Association")
+
+limma.lm=ggplot(data = limma.hm.lm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("Limma") + geom_text(aes(label = round(Association, 2)))
+RUV.lm=ggplot(data = RUV.hm.lm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("RUVs") + geom_text(aes(label = round(Association, 2)))
+# use ggarange to plot both heatmaps
+pdf(paste0(outputdir,"Heatmap_SigCovar_RUVvsLM_OnlyCovarInLM.pdf"), height=7, width=15)
+ggarrange(limma.lm,RUV.lm)
+dev.off()
+
 # Compare p-value distributions of both -----------------------------------------------
+
+# Verify that control housekeeping genes are not significantly DE. Set up list of housekeeping genes as controls (from Eisenberg and Levanon, 2003)
+housekeeping=read.table(paste0(housekeepingdir,"Housekeeping_ControlGenes.txt"), as.is=T, header=F)
+# if this is broken, use host = "uswest.ensembl.org"
+ensembl.mart.90 <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset='hsapiens_gene_ensembl', host = 'www.ensembl.org', ensemblRedirect = FALSE)
+biomart.results.table <- getBM(attributes = c('ensembl_gene_id', 'external_gene_name'), mart = ensembl.mart.90,values=housekeeping, filters="hgnc_symbol")
+hkGenes=as.vector(biomart.results.table[,1])
+hkControls=hkGenes[which(hkGenes %in% rownames(y$counts))]
 
 pdf(paste0(outputdir,"VolcanoPlot_RUVvsLM.pdf"), height=10, width=15)
 layout(matrix(c(1,2,3,4,5,6), nrow=3,byrow = F))
 for (i in 1:ncol(efit.lm)){
-    plot(efit.lm$coef[,i], -log10(as.matrix(efit.lm$p.value)[,i]), pch=20, main=paste("LM",colnames(efit)[i],sep="\n"), xlab="log2FoldChange", ylab="-log10(pvalue)")
+    plot(efit.lm$coef[,i], -log10(as.matrix(efit.lm$p.value)[,i]), pch=20, main=paste("LM",colnames(efit.lm)[i],sep="\n"), xlab="log2FoldChange", ylab="-log10(pvalue)")
     points(efit.lm$coef[,i][which(names(efit.lm$coef[,i]) %in% hkControls)], -log10(as.matrix(efit.lm$p.value)[,i][which(names(efit.lm$coef[,i]) %in% hkControls)]) , pch=20, col=4, xlab="log2FoldChange", ylab="-log10(pvalue)")
     legend("topleft", "genes", "hk genes",fill=4)
     abline(v=c(-1,1))
 }
 for (i in 1:ncol(efit.RUV)){
-    plot(efit.RUV$coef[,i], -log10(as.matrix(efit.RUV$p.value)[,i]), pch=20, main=paste("RUV",colnames(efit)[i],sep="\n"), xlab="log2FoldChange", ylab="-log10(pvalue)")
+    plot(efit.RUV$coef[,i], -log10(as.matrix(efit.RUV$p.value)[,i]), pch=20, main=paste("RUV",colnames(efit.RUV)[i],sep="\n"), xlab="log2FoldChange", ylab="-log10(pvalue)")
     points(efit.RUV$coef[,i][which(names(efit.RUV$coef[,i]) %in% hkControls)], -log10(as.matrix(efit.RUV$p.value)[,i][which(names(efit.RUV$coef[,i]) %in% hkControls)]) , pch=20, col=2, xlab="log2FoldChange", ylab="-log10(pvalue)")
     legend("topleft", "genes", "hk genes",fill=2)
     abline(v=c(-1,1))
@@ -351,9 +383,9 @@ for (i in 1:ncol(efit.lm)){
     notInLM=names(RUVs[which(names(RUVs) %!in% names(lm))])
     notInRUV=names(lm[which(names(lm) %!in% names(RUVs))])
     topTable.lm <- topTable(efit.lm, coef=i, n=Inf)
-    topTable.RUV <- topTable(efit, coef=i, n=Inf)
+    topTable.RUV <- topTable(efit.RUV, coef=i, n=Inf)
 
-    plot(topTable.lm[notInLM,]$adj.P.Val, abs(topTable.lm[notInLM,]$logFC), pch=16, main=paste("Top DE Genes Not in Common", colnames(efit)[i], sep="\n"), xlab="adjusted p.value", ylab="logFC")
+    plot(topTable.lm[notInLM,]$adj.P.Val, abs(topTable.lm[notInLM,]$logFC), pch=16, main=paste("Top DE Genes Not in Common", colnames(efit.lm)[i], sep="\n"), xlab="adjusted p.value", ylab="logFC")
     points(topTable.RUV[notInRUV,]$adj.P.Val, abs(topTable.RUV[notInRUV,]$logFC), col="red", pch=16)
     text(topTable.lm[notInLM,]$adj.P.Val, abs(topTable.lm[notInLM,]$logFC), labels=topTable.lm[notInLM,]$SYMBOL, pos=1)
     text(topTable.RUV[notInRUV,]$adj.P.Val, abs(topTable.RUV[notInRUV,]$logFC), labels=topTable.RUV[notInRUV,]$SYMBOL, col="red", pos=2)

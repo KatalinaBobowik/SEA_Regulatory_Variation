@@ -234,7 +234,7 @@ pdf(paste0(outputdir, "nGenes_indoRNA_postFiltering_123Combined.pdf"), height=10
 dev.off()
 
 # Compare library size density before and after removing lowly-expressed genes
-pdf(paste0(outputdir, "libraryDensity_afterFiltering_afterNormalization_indoRNA.pdf"), height=8, width=15)
+pdf(paste0(outputdir, "libraryDensity_afterFiltering_indoRNA.pdf"), height=8, width=15)
   nsamples <- ncol(y)
   par(mfrow=c(1,2))
   plot(density(lcpm[,1]), col=batch.col[y$samples$batch][1], lwd=2, ylim=c(0,max(density(lcpm)$y)+.1), las=2, main="", xlab="")
