@@ -9,7 +9,7 @@ library(RColorBrewer)
 library(edgeR)
 library(plyr)
 library(NineteenEightyR)
-library(Homo.sapiens)
+library(biomaRt)
 
 # set up colour palette. The "wes" palette will be used for island and other statistical information, whereas NineteenEightyR will be used for batch information
 wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467","#5B1A18")
@@ -61,11 +61,16 @@ samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
 
 rm(featureCountsOut) # clean up, big object
 
-# Organise gene annotation using bioconductor's Homo.sapiens package, version 1.3.1 (Based on genome:  hg19)
+# Organise gene annotation using biomart
+ensembl.mart.90 <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset='hsapiens_gene_ensembl', host = 'www.ensembl.org', ensemblRedirect = FALSE)
 geneid <- rownames(y)
-genes <- select(Homo.sapiens, keys=geneid, columns=c("SYMBOL", "TXCHROM"), keytype="ENSEMBL")
+geneid = as.matrix(geneid)
+​colnames(geneid) = "ensembl_gene_id"  #name of column in results to join on
+genes <- getBM(attributes = c('ensembl_gene_id','external_gene_name','chromosome_name'), mart = ensembl.mart.90,values=geneid, filters="ensembl_gene_id")
 # Check for and remove duplicated gene IDs, then add genes dataframe to DGEList object
-genes <- genes[!duplicated(genes$ENSEMBL),]
+genes <- genes[!duplicated(genes$ensembl_gene_id),]
+genes = merge(x = geneid, y = genes, by="ensembl_gene_id",all.x=TRUE)
+colnames(genes)=c("ENSEMBL","SYMBOL","TXCHROM")
 y$genes <- genes
 
 # assign batch
