@@ -8,19 +8,15 @@ library(plyr)
 library(NineteenEightyR)
 library(RColorBrewer)
 library(biomaRt)
-#library(ggpubr)
 library(ggplot2)
 library(ggsignif)
-#library(viridis)
-#library(gplots)
-#library(circlize)
 library(EGSEA)
 library(goseq)
 library(ReactomePA)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/"
-revigodir= "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/REVIGO/Limma/"
+revigodir= "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/REVIGO/"
 
 # Set output directory and create it if it does not exist:
 outputdir <- "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/DE_Island/LM_allCovarPlusBlood/GeneSetAnalysis/"
@@ -80,7 +76,7 @@ for (i in 1:ncol(contr.matrix)){
 # gene set testing with goSeq
 for(pop in 1:ncol(voomDupEfit)){
     for(pval in c(0.05, 0.01)){
-        topTable <- topTable(voomDupEfit, coef=pop, n=Inf, p.value=pval, lfc=1)
+        topTable <- topTable(voomDupEfit, coef=pop, n=Inf, p.value=pval, lfc=0.5)
         gene.vector=as.integer(rownames(y) %in% rownames(topTable))
         names(gene.vector)=rownames(y)
 
@@ -91,7 +87,7 @@ for(pop in 1:ncol(voomDupEfit)){
 
         # now let's interpret the results. First we need to apply a multiple hypothesis testing correction set at 5% (BH method)
         enriched.GO=GO.wall[p.adjust(GO.wall$over_represented_pvalue, method="BH")<.05,]
-        write.table(enriched.GO, file=paste0(outputdir,"enrichedGOterms_",colnames(voomDupEfit)[pop],pval,".txt"), quote=F, row.names=F)
+        write.table(enriched.GO, file=paste0(outputdir,"enrichedGOterms_lfc0.5_",colnames(voomDupEfit)[pop],pval,".txt"), quote=F, row.names=F)
         if(nrow(enriched.GO)>0){
             zz=file(paste0(outputdir,"topTen_enrichedGOterms_",pop,pval,".txt"), open="wt")
             sink(zz)
@@ -119,7 +115,7 @@ for(pop in 1:ncol(voomDupEfit)){
         pwf=nullp(gene.vector,"hg19","ensGene")
         KEGG=goseq(pwf,gene2cat=kegg, use_genes_without_cat=TRUE)
         enriched.GO.kegg=KEGG[p.adjust(KEGG$over_represented_pvalue, method="BH")<.05,]
-        write.table(enriched.GO.kegg, file=paste0(outputdir,"enrichedGOkegg_",pop,pval,".txt"))
+        write.table(enriched.GO.kegg, file=paste0(outputdir,"enrichedGOkegg_lfc0.5_",pop,pval,".txt"))
     }
 }
 
@@ -128,17 +124,10 @@ for(pop in 1:ncol(voomDupEfit)){
 # Having played around with many visualisation options, it seems as though using Revigo is the best and most user-friendly. Using the output from the GoSeq enriched Go results (FDR <0.05), we can plug our GO IDs into Revigo (http://revigo.irb.hr/) and then output this as an R script.
 # First save  output (remember that SMBvsMTW has no significantly enriched GO pathways so we'll only do this for SMBvsMPI and MTWvsMPI)  
 
-# Revigo for MTW vs MPI (pval of 0.05 FDR)
-# scatterplot
-source(paste0(revigodir,"REVIGO-MTWvsMPI.r"))
-# treemap
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/REVIGO/Limma/REVIGO_treemap-MTWvsMPI.r")
-
-# Revigo for SMB vs MPI (pval of 0.05 FDR)
-# scatterplot
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/REVIGO/Limma/REVIGO-SMBvsMPI.r")
-# treemap
-source("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/SEA_Regulatory_Variation/code/Differential_Expression/123_combined/REVIGO/Limma/REVIGO_treemap-SMBvsMPI.r")
+# Revigo for MTW vs MPI (pval of 0.01 and LFC of 0.05 FDR)
+source(paste0(revigodir,"REVIGO_MTWvsMPI_LFC05_Pval01.r"))
+# SMB vs MPI
+source(paste0(revigodir,"REVIGO_SMBvsMPI_LFC05_Pval01.r"))
 
 
 # EGSEA -----------------------------------------------------------------------

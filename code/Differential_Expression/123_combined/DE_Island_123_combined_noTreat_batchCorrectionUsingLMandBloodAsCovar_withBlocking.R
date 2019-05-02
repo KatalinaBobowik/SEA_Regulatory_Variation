@@ -19,6 +19,7 @@ library(viridis)
 library(gplots)
 library(circlize)
 library(ComplexHeatmap)
+library(EnsDb.Hsapiens.v86)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
@@ -393,6 +394,7 @@ for (name in numericVariables){
 # Get PCA associations
 all.pcs <- pc.assoc(pcaresults)
 all.pcs$Variance <- pcaresults$sdev^2/sum(pcaresults$sdev^2)
+write.table(all.pcs, file=paste0(outputdir,"pca_covariates_blood_RNASeqDeconCell.txt"), col.names=T, row.names=F, quote=F, sep="\t")
 
 # get rid of covariates we aren't interested in for the heatmap
 covariate.names=covariate.names[grep("lib.size|ID|microscopy.pos|PCR.pos|fract.pfpx.reads|replicate|ind",covariate.names, invert=T)]
@@ -401,9 +403,6 @@ covariate.names=covariate.names[grep("lib.size|ID|microscopy.pos|PCR.pos|fract.p
 pdf(paste0(outputdir,"significantCovariates_AnovaHeatmap.pdf"))
 pheatmap(log(all.pcs[1:5,covariate.names]), cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
 dev.off()
-
-# Write out the covariates:
-write.table(all.pcs, file=paste0(outputdir,"pca_covariates_blood_RNASeqDeconCell.txt"), col.names=T, row.names=F, quote=F, sep="\t")
 
 # Summary and visualisation of gene trends ---------------------------------------------------------------------------
 
@@ -443,9 +442,6 @@ dev.off()
 # We can also look at the top ten DE genes with a heatmap of logCPM values for the top 100 genes. Each gene (or row) is scaled so that mean expression is zero and the standard deviation is one (we're using 'E' from the voom object which is a numeric matrix of normalized expression values on the log2 scale). Samples with relatively high expression of a given gene are marked in red and samples with relatively low expression are marked in blue. Lighter shades and white represent genes with intermediate expression levels. Samples and genes are reordered by the method of hierarchical clustering
 # first, make a heatmap of all top genes in one pdf
 
-# reset ensemble row names to gene symbols
-rownames(vDup$E)=vDup$genes$SYMBOL
-
 # set up annotation
 col_fun = colorRamp2(c(-4, 0, 4), c("blue", "white", "red"))
 
@@ -467,6 +463,9 @@ layout.row=c(1,1,2)
 # set up column position
 layout.col=c(1,2,1)
 
+# get annotation for gene names
+edb <- EnsDb.Hsapiens.v86
+
 for (i1 in island1){
     island2=island2[-1]
     for (i2 in island2){
@@ -476,7 +475,10 @@ for (i1 in island1){
         pushViewport(viewport(layout.pos.row = layout.row[counter], layout.pos.col = layout.col[counter]))
         df=data.frame(island = as.character(Island[grep(paste(i1,i2,sep="|"), Island)]))
         ha =  HeatmapAnnotation(df = df, col = list(island = c("Mentawai" =  1, "Sumba" = 2, "West Papua" = 3)))
-        draw(Heatmap(t(scale(t(vDup$E[index,])))[,grep(paste(i1,i2,sep="|"), Island)], col=col_fun, column_title = colnames(voomDupEfit)[counter], top_annotation = ha, show_row_names = T, show_heatmap_legend = F, show_column_names = F, name = "Z-Score"),show_annotation_legend = TRUE,newpage=F)
+        transformedHeatmap=t(scale(t(vDup$E[index,])))[,grep(paste(i1,i2,sep="|"), Island)]
+        genesymbol <- select(edb, keys=rownames(transformedHeatmap), columns=c("SYMBOL"), keytype="GENEID")$SYMBOL
+        rownames(transformedHeatmap)=genesymbol
+        draw(Heatmap(transformedHeatmap, col=col_fun, column_title = colnames(voomDupEfit)[counter], top_annotation = ha, show_row_names = T, show_heatmap_legend = F, show_column_names = F, name = "Z-Score"),show_annotation_legend = TRUE,newpage=F)
         upViewport()
     }
 }
@@ -495,6 +497,7 @@ pdf(paste0(outputdir,"vennDiagram_allSigDEGenes_pval01_FDR1_dupCor.pdf"), height
 vennDiagram(dt[,1:3], circle.col=c(9,10,11))
 dev.off()
 
+
 # get DE genes in common with populations compared to Mappi, i.e., SMBvsMPI and MTWvsMPI (since we think this is an interesting island comparison)
 rownames(voomDupEfit$genes)=voomDupEfit$genes$ENSEMBL
 de.common.MPI = which(dt[,2]!=0 & dt[,3]!=0)
@@ -503,6 +506,7 @@ commonGenes.MPI <- getBM(attributes = c('ensembl_gene_id', 'external_gene_name',
 # save the common gene names 
 de.common.MPI=voomDupEfit$genes[names(de.common.MPI),]
 write.table(de.common.MPI, file=paste0(outputdir,"allCommonGenes_MPI_dupcor.txt"))
+
 
 # now plot the common genes to see if they're being regulated in the same direction
 tt.SMBvsMPI=topTable(voomDupEfit, coef=2, p.value=0.01, n=Inf, lfc=1, sort.by="p")
@@ -537,6 +541,9 @@ for (i in 1:ncol(voomDupEfit)){
 topGenes.pvalue=formatC(topGenes.pvalue, format="e", digits=2, drop0trailing=T)
 # convert e notation to base 10 notation
 topGenes.pvalue=sub("e", "x10^", topGenes.pvalue)
+
+# reset ensemble row names to gene symbols
+rownames(vDup$E)=vDup$genes$SYMBOL
 
 # We can make the violin plots using ggpubr
 pdf(paste0(outputdir,"TopGenes_ggboxplot_Island.pdf"), height=8, width=10)

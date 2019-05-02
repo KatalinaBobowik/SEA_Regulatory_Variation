@@ -212,7 +212,7 @@ design <- model.matrix(~0 + Island)
 colnames(design)=gsub("Island", "", colnames(design))
 colnames(design)[(3)]=c("Mappi")
 # here, we're using log2-cpm values of the TMM-normalised data. This seems to be suffiecient (i.e., voom-corrected output is not necessary). See link here: https://support.bioconductor.org/p/76837/.
-batch.corrected.lcpm <- removeBatchEffect(lcpm, batch=batch, covariates = cbind(y$samples$Age, y$samples$RIN, y$sample$CD8T, y$sample$CD4T, y$sample$NK, y$sample$Bcell, y$sample$Monoy$sample$Gran),design=design)
+batch.corrected.lcpm <- removeBatchEffect(lcpm, batch=batch, covariates = cbind(y$samples$Age, y$samples$RIN, y$sample$CD8T, y$sample$CD4T, y$sample$NK, y$sample$Bcell, y$sample$Mono, y$sample$Gran),design=design)
 
 # This is our PCA plotting function. We might need it later to explore differnet dimensions of the PCA
 plot.pca <- function(dataToPca, speciesCol, namesPch, sampleNames){
@@ -261,8 +261,18 @@ for (name in covariate.names){
  assign(name, y$samples[[paste0(name)]])
 }
 
-# get rid of covariates we aren't interested in
-covariate.names=covariate.names[grep("lib.size|ID|microscopy.pos|PCR.pos|fract.pfpx.reads|replicate|ind",covariate.names, invert=T)]
+# Age, RIN, and library size need to be broken up into chunks for easier visualisation of trends (for instance in Age, we want to see high age vs low age rather than the effect of every single age variable)
+for (name in c("Age","RIN","lib.size")){
+  assign(name, cut(as.numeric(as.character(y$samples[[paste0(name)]])), breaks=5))
+}
+
+# assign names to covariate names so you can grab individual elements by name
+names(covariate.names)=covariate.names
+
+# assign factor variables
+factorVariables=c(colnames(Filter(is.factor,y$samples))[which(colnames(Filter(is.factor,y$samples)) %in% covariate.names)], "Age", "lib.size", "RIN")
+numericVariables=colnames(Filter(is.numeric,y$samples))[which(colnames(Filter(is.numeric,y$samples)) %in% covariate.names)] %>% subset(., !(. %in% factorVariables))
+
 # Prepare covariate matrix
 all.covars.df <- y$samples[,covariate.names]
 
