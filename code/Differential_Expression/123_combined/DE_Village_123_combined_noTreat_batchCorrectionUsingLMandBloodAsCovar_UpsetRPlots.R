@@ -18,6 +18,7 @@ library(gplots)
 library(circlize)
 library(ComplexHeatmap)
 library(EnsDb.Hsapiens.v86)
+library(wesanderson)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
@@ -31,10 +32,15 @@ if (file.exists(outputdir) == FALSE){
 }
 
 # Load colour schemes:
-wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467","#5B1A18")
-palette(c(wes, brewer.pal(8,"Dark2")))
-# set up colour palette for batch
-batch.col=electronic_night(n=3)
+# Load colour schemes:
+mappi <- wes_palette("Zissou1", 20, type = "continuous")[20]
+mentawai <- wes_palette("Zissou1", 20, type = "continuous")[1]
+sumba <- wes_palette("Zissou1", 20, type = "continuous")[11]
+
+smb_mtw <- wes_palette("Darjeeling1", 9, type = "continuous")[3]
+smb_mpi <- wes_palette("Darjeeling1", 9, type = "continuous")[7]
+mtw_mpi <- "darkorchid4"
+
 dev.off()
 
 
@@ -71,28 +77,167 @@ colnames(design)=gsub("samples", "", colnames(design))
 contr.matrix <- makeContrasts(ANKvsMDB=Anakalung-Madobag, ANKvsMPI=Anakalung-Mappi, ANKvsTLL=Anakalung-Taileleu, ANKvsWNG=Anakalung-Wunga, MDBvsMPI=Madobag-Mappi, MDBvsTLL=Madobag-Taileleu, WNGvsMDB=Wunga-Madobag, TLLvsMPI=Taileleu-Mappi, WNGvsMPI=Wunga-Mappi, WNGvsTLL=Wunga-Taileleu, levels=colnames(design)) # Contrasts are ordered in the same order as the island ones, in case we want to look at directional effects
 
 # now go ahead with voom normalisation
-pdf("Limma_voom_TMMNormalisation.pdf", height=8, width=12)
-par(mfrow=c(ncol=1,nrow=2))
-v <- voom(y, design, plot=TRUE)
-# fit linear models
+# Using duplicate correlation and blocking -----------------------------------------------------
+
+# First, we need to perform voom normalisation
+v <- voom(y, design, plot=F)
+
+# create a new variable for blocking using sample IDs
+# define sample names
+samplenames <- as.character(y$samples$samples)
+samplenames <- sub("([A-Z]{3})([0-9]{3})", "\\1-\\2", samplenames)
+samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
+
+y$samples$ind <- samplenames
+
+# Estimate the correlation between the replicates.
+# Information is borrowed by constraining the within-block corre-lations to be equal between genes and by using empirical Bayes methods to moderate the standarddeviations between genes 
+dupcor <- duplicateCorrelation(v, design, block=y$samples$ind)
+
+# run voom a second time with the blocking variable and estimated correlation
+# The  vector y$samples$ind indicates the  two  blocks  corresponding  to  biological  replicates
+pdf(paste0(outputdir,"Limma_voomDuplicateCorrelation_TMMNormalisation.pdf"), height=8, width=12)
+par(mfrow=c(1,2))
+vDup <- voom(y, design, plot=TRUE, block=y$samples$ind, correlation=dupcor$consensus)
+dupcor <- duplicateCorrelation(vDup, design, block=y$samples$ind) # get warning message: Too much damping - convergence tolerance not achievable
+
+# With duplicate correction and blocking:
+# the inter-subject correlation is input into the linear model fit
+voomDupVfit <- lmFit(vDup, design, block=y$samples$ind, correlation=dupcor$consensus)
+voomDupVfit <- contrasts.fit(voomDupVfit, contrasts=contr.matrix)
+voomDupEfit <- eBayes(voomDupVfit, robust=T)
+
+plotSA(voomDupEfit, main="Mean-variance trend elimination with duplicate correction")
+dev.off()
+
+# save voom and efit object
+save(vDup, file = paste0(outputdir, "vDup_Village.Rda"))
+save(voomDupEfit, file = paste0(outputdir, "voomDupEfit_Village.Rda"))
+
+# get top genes using toptable
+allDEresults <- list()
+
+for(i in 1:ncol(voomDupEfit)){
+    allDEresults[[i]] <- topTable(voomDupEfit, coef=i, n=Inf, sort.by="p")
+}
+
+# get number of DE genes at differnet thresholds
+# noLFC
+summary(decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01))
+#       ANKvsMDB ANKvsMPI ANKvsTLL ANKvsWNG MDBvsMPI MDBvsTLL WNGvsMDB TLLvsMPI
+#Down         59     1167      475        1      391      111      567     2112
+#NotSig    12844    10821    12066    12973    12027    12504    12005     9005
+#Up           72      987      434        1      557      360      403     1858
+#       WNGvsMPI WNGvsTLL
+#Down       2126      690
+#NotSig     8875    11756
+#Up         1974      529
+
+# LFC of 0.5
+summary(decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=0.5))
+#       ANKvsMDB ANKvsMPI ANKvsTLL ANKvsWNG MDBvsMPI MDBvsTLL WNGvsMDB TLLvsMPI
+#Down         19      323       78        0      160        8      149      719
+#NotSig    12903    12108    12687    12974    12482    12922    12657    11815
+#Up           53      544      210        1      333       45      169      441
+#       WNGvsMPI WNGvsTLL
+#Down        725      139
+#NotSig    11344    12607
+#Up          906      229
+
+# LFC of 1
+summary(decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=1))
+#       ANKvsMDB ANKvsMPI ANKvsTLL ANKvsWNG MDBvsMPI MDBvsTLL WNGvsMDB TLLvsMPI
+#Down          5       50        9        0       52        2       17      121
+#NotSig    12948    12717    12912    12974    12798    12969    12908    12723
+#Up           22      208       54        1      125        4       50      131
+#       WNGvsMPI WNGvsTLL
+#Down        129        8
+#NotSig    12543    12914
+#Up          303       53
+
+for (i in 1:ncol(efit)){
+    write.table(allDEresults[[i]], file=paste0(outputdir,"topTable.voomNoNorm.tmm.filtered.dup_corrected.village.", colnames(contr.matrix)[i], ".txt"))
+}
+
+# Without duplicate correlation -------------------------------------------------
+
 vfit <- lmFit(v, design)
 vfit <- contrasts.fit(vfit, contrasts=contr.matrix)
 efit <- eBayes(vfit, robust=T)
-plotSA(efit, main="Mean-variance trend elimination")
+
+pdf(file=paste0(edaoutput, "voomNoNorm.tmm.filtered.indoRNA.no_dup_correction.mean-variance-trend.village.pdf"))
+    plotSA(efit, main="Mean-variance trend elimination without duplicate correction")
 dev.off()
 
-# We can view how UQ normalisation performed using MD plots. This visualizes the library size-adjusted log-fold change between
-# two libraries (the difference) against the average log-expression across those libraries (themean). MD plots are generated by comparing sample 1 against an artificial
-# library constructed from the average of all other samples. Ideally, the bulk of genes should be centred at a log-fold change of zero.  This indicates
-# that any composition bias between libraries has been successfully removed
-
-pdf("MDPlots_TMM_Normalisation_OutliersCheck.pdf", height=15, width=15)
-par(mfrow=c(4,4))
-for (i in 1:ncol(y)){
-  plotMD(cpm(y, log=TRUE), column=i)
-  abline(h=0, col="red", lty=2, lwd=2)
+# get top genes using toptable
+allDEresultsNoDup <- list()
+for(i in 1:ncol(efit)){
+    allDEresultsNoDup[[i]] <- topTable(efit, coef=i, n=Inf, sort.by="p")
 }
-dev.off()
+
+# no LFC threshold
+summary(decideTests(efit, method="separate", adjust.method = "BH", p.value = 0.01))
+#       ANKvsMDB ANKvsMPI ANKvsTLL ANKvsWNG MDBvsMPI MDBvsTLL WNGvsMDB TLLvsMPI
+#Down         95     1568      557        1      503      118      675     2186
+#NotSig    12785    10184    11936    12973    11857    12514    11792     8939
+#Up           95     1223      482        1      615      343      508     1850
+#       WNGvsMPI WNGvsTLL
+#Down       2459      867
+#NotSig     8388    11403
+#Up         2128      705
+
+# LFC of 0.05
+summary(decideTests(efit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=0.5))
+#Down         23      435       95        1      189        9      177      728
+#NotSig    12887    11911    12644    12973    12434    12923    12587    11790
+#Up           65      629      236        1      352       43      211      457
+#       WNGvsMPI WNGvsTLL
+#Down        816      176
+#NotSig    11194    12493
+#Up          965      306
+
+# LFC of 1
+summary(decideTests(efit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=1))
+#       ANKvsMDB ANKvsMPI ANKvsTLL ANKvsWNG MDBvsMPI MDBvsTLL WNGvsMDB TLLvsMPI
+#Down          3       61        9        1       61        2       21      121
+#NotSig    12948    12674    12903    12973    12782    12969    12884    12727
+#Up           24      240       63        1      132        4       70      127
+#       WNGvsMPI WNGvsTLL
+#Down        146       13
+#NotSig    12509    12894
+#Up          320       68
+
+for (i in 1:ncol(efit)){
+    write.table(allDEresultsNoDup[[i]], file=paste0(outputdir,"topTable.voomNoNorm.tmm.filtered.not_dup_corrected.village.", colnames(contr.matrix)[i], ".txt"))
+}
+
+for (i in 1:ncol(efit)){
+    withWithout <- join(allDEresults[[i]], allDEresultsNoDup[[i]], by="ENSEMBL")
+    print(paste0("Spearman correlation between methods in ", colnames(contr.matrix)[i], ":"))
+    print(cor(withWithout[,6], withWithout[,12], method="spearman"))
+}
+
+#[1] "Spearman correlation between methods in ANKvsMDB:"
+#[1] 0.950506
+#[1] "Spearman correlation between methods in ANKvsMPI:"
+#[1] 0.9495114
+#[1] "Spearman correlation between methods in ANKvsTLL:"
+#[1] 0.942682
+#[1] "Spearman correlation between methods in ANKvsWNG:"
+#[1] 0.9459589
+#[1] "Spearman correlation between methods in MDBvsMPI:"
+#[1] 0.958493
+#[1] "Spearman correlation between methods in MDBvsTLL:"
+#[1] 0.9442371
+#[1] "Spearman correlation between methods in WNGvsMDB:"
+#[1] 0.9507572
+#[1] "Spearman correlation between methods in TLLvsMPI:"
+#[1] 0.9445926
+#[1] "Spearman correlation between methods in WNGvsMPI:"
+#[1] 0.9471946
+#[1] "Spearman correlation between methods in WNGvsTLL:"
+#[1] 0.9451869
+
 
 # QC after fitting linear models --------------------------------------------------------------------------------------
 
@@ -142,16 +287,38 @@ colnames(design)=gsub("samples", "", colnames(design))
 
 # Remove unused columns from lcpm matrix
 lcpm=lcpm[,which(colnames(lcpm) %in% colnames(y))]
-
-batch.corrected.lcpm <- removeBatchEffect(lcpm, batch=y$samples$batch, covariates = cbind(y$samples$Age, y$samples$RIN, y$samples$CD8T, y$samples$CD4T, y$samples$NK, y$samples$Bcell, y$samples$Monoy$samples$Gran),design=design)
+batch.corrected.lcpm <- removeBatchEffect(lcpm, batch=y$samples$batch, covariates = cbind(y$samples$Age, y$samples$RIN, y$samples$CD8T, y$samples$CD4T, y$samples$NK, y$samples$Bcell, y$samples$Mono, y$samples$Gran), design=design)
 
 # rename column names of lcpm to sample names (so that they are shorter and easier to read)
-colnames(lcpm)=sapply(strsplit(colnames(lcpm),"[_.]"), `[`, 1)
-# now add a hyphen inbetween the tribe abbreviation and number to keep consistency
-colnames(lcpm)[104:107]=sapply(colnames(lcpm)[104:107],function(x)sub("([[:digit:]]{3,3})$", "-\\1", x))
+colnames(lcpm)=samplenames
 
 # get which samples are replicates
+load(paste0(inputdir, "covariates.Rda"))
+allreps=covariates[,1][which(covariates$replicate)]
+allreps=unique(allreps)
 allreplicated=as.factor(samplenames %in% allreps)
+
+# assign covariate names
+# subtract variables we don't need
+subtract=c("group", "norm.factors", "samples")
+# get index of unwanted variables
+subtract=which(colnames(y$samples) %in% subtract)
+covariate.names = colnames(y$samples)[-subtract]
+for (name in covariate.names){
+ assign(name, y$samples[[paste0(name)]])
+}
+
+# Age, RIN, and library size need to be broken up into chunks for easier visualisation of trends (for instance in Age, we want to see high age vs low age rather than the effect of every single age variable)
+for (name in c("Age","RIN","lib.size")){
+  assign(name, cut(as.numeric(as.character(y$samples[[paste0(name)]])), breaks=5))
+}
+
+# assign names to covariate names so you can grab individual elements by name
+names(covariate.names)=covariate.names
+
+# assign factor variables
+factorVariables=c(colnames(Filter(is.factor,y$samples))[which(colnames(Filter(is.factor,y$samples)) %in% covariate.names)], "Age", "lib.size", "RIN")
+numericVariables=colnames(Filter(is.numeric,y$samples))[which(colnames(Filter(is.numeric,y$samples)) %in% covariate.names)] %>% subset(., !(. %in% factorVariables))
 
 # PCA plotting function
 plot.pca <- function(dataToPca, speciesCol, namesPch, sampleNames){
@@ -190,47 +357,47 @@ pc.assoc <- function(pca.data){
 }
 
 # Prepare covariate matrix
-all.covars.df <- y$samples[,c(3,5:22)] 
+all.covars.df <- y$samples[,covariate.names]
 
 # Plot PCA
-for (name in covariate.names[c(1:10,17:18)]){
+for (name in factorVariables){
   if (nlevels(get(name)) < 26){
-    pdf(paste0("batchCorrected_pcaresults_",name,".pdf"))
+    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
     pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=as.numeric(get(name)),namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
     dev.off()
   } else {
-    pdf(paste0("pcaresults_",name,".pdf"))
+    pdf(paste0(outputdir,"pcaresults_",name,"_RemoveBatchEffect.pdf"))
     pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=as.numeric(get(name)),namesPch=20,sampleNames=get(name))
     dev.off()
   }
 }
 
-# plot batch (this has to be done separately since it ha sa different colour scheme)
-pdf(paste0("batchCorrected_pcaresults_batch.pdf"))
+# plot batch
+pdf(paste0(outputdir,"pcaresults_batch.pdf"))
 name="batch"
 pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=batch.col[as.numeric(batch)],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=batch)
 dev.off()
   
-# plot blood - this one also has a differnet gradient colour scheme
-for (name in covariate.names[c(11:16)]){
-    initial <- cut(get(name), breaks = seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
+# plot numeric variables
+for (name in numericVariables){
+    initial = .bincode(get(name), breaks=seq(min(get(name), na.rm=T), max(get(name), na.rm=T), len = 80),include.lowest = TRUE)
     bloodCol <- colorRampPalette(c("blue", "red"))(79)[initial]
-    pdf(paste0("batchCorrected_pcaresults_",name,".pdf"))
+    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
     pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=bloodCol,namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
+    legend(legend=c("High","Low"), pch=16, x="bottomright", col=c(bloodCol[which.max(get(name))], bloodCol[which.min(get(name))]), cex=0.6, title=name, border=F, bty="n")
+    legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
     dev.off()
 }
 
 # Get PCA associations
 all.pcs <- pc.assoc(pcaresults)
 all.pcs$Variance <- pcaresults$sdev^2/sum(pcaresults$sdev^2)
+write.table(all.pcs, file=paste0(outputdir,"pca_covariates_blood_RNASeqDeconCell.txt"), col.names=T, row.names=F, quote=F, sep="\t")
 
 # plot pca covariates association matrix to illustrate any remaining confounding/batch
-pdf("significantCovariates_AnovaHeatmap.pdf")
-pheatmap(all.pcs[1:5,c(3:20)], cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
+pdf(paste0(outputdir,"significantCovariates_AnovaHeatmap.pdf"))
+pheatmap(log(all.pcs[1:5,covariate.names]), cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
 dev.off()
-
-# Write out the covariates:
-write.table(all.pcs, file="pca_covariates_blood.txt", col.names=T, row.names=F, quote=F, sep="\t")
 
 # Summary and visualisation of gene trends ---------------------------------------------------------------------------
 
@@ -249,50 +416,46 @@ logFC.df=cbind(logFC = c(0,0.5,1), logFC.df)
 write.table(logFC.df, file="logFC_thresholds.txt", sep="\t", quote=F)
 
 dt <- decideTests(efit, p.value=0.01, lfc=1)
-# get summary of decide tests statistics
-write.table(summary(dt), file="numberSigDEgenes_voom_efit.txt")
-# write out top table results 
-write.fit(efit, dt, file="toptable_SigGenes_voom_efit.txt")
+
+# plot log2 fold change between islands
+pdf(paste0(outputdir,"log2FC_IslandComparisons_pval01_dupCor.pdf"))
+# note 'p.value' is the cutoff value for adjusted p-values
+reordered.efit=voomDupEfit[,c("ANKvsMDB", "ANKvsTLL", "WNGvsMDB", "WNGvsTLL", "ANKvsMPI", "WNGvsMPI", "MDBvsMPI", "TLLvsMPI", "ANKvsWNG", "MDBvsTLL")]
+col=c(rep(smb_mtw,4), rep(smb_mpi, 2), rep(mtw_mpi, 2), sumba, mentawai)
+topTable <- topTable(reordered.efit, coef=1, n=Inf, p.value=0.01)
+plot(density(topTable$logFC), col=col[1], xlim=c(-3,3), ylim=c(0,1.5), main="LogFC Density", xlab="LogFC", ylab="Density")
+abline(v=c(-1,-0.5,0.5,1), lty=3)
+counter=0
+for (i in 2:ncol(reordered.efit)){
+    counter=counter+1
+    topTable <- topTable(reordered.efit, coef=i, n=Inf, p.value=0.01)
+    lines(density(topTable$logFC), col=col[i], xlim=c(-3,3), ylim=c(0,1.5))
+}
+legend(x="topright", bty="n", col=col, legend=colnames(voomDupEfit), lty=1, lwd=2)
+dev.off()
 
 # graphical representation of DE results through MD plot
 pdf("MD_Plots_pval01_lfc1.pdf", height=15, width=10)
 par(mfrow=c(5,2))
-for (i in 1:ncol(efit)){
-    o <- which(names(efit$Amean) %in% names(which(abs(dt[,i])==1)))
-    x <- efit$Amean
-    z <- efit$coefficients[,i]
-    t=which(names(efit$coefficients[,i]) %in% names(which(abs(dt[,i])==1)))
-    G <- efit$genes[names(which(abs(dt[,i])==1)),]$SYMBOL
-    plotMD(efit, column=i, status=dt[,i], main=colnames(efit)[i], hl.col=c("blue","red"), values=c(-1,1))
+for (i in 1:ncol(voomDupEfit)){
+    o <- which(names(voomDupEfit$Amean) %in% names(which(abs(dt[,i])==1)))
+    x <- voomDupEfit$Amean
+    z <- voomDupEfit$coefficients[,i]
+    t=which(names(voomDupEfit$coefficients[,i]) %in% names(which(abs(dt[,i])==1)))
+    G <- voomDupEfit$genes[which(abs(dt[,i])==1),]$SYMBOL
+    plotMD(voomDupEfit, column=i, status=dt[,i], main=colnames(voomDupEfit)[i], hl.col=c("blue","red"), values=c(-1,1))
     abline(h=c(1,-1), lty=2)
     legend(legend=paste(names(summary(dt)[,i]), summary(dt)[,i], sep="="), x="bottomright", border=F, bty="n")
-    if(length(o)>0){
-        text(x[o], z[t], labels=G)
-    }
+    text(x[o], z[t], labels=G)
 }
 dev.off()
 
-# plot log2 fold change between villages
-pdf("log2FC_IslandComparisons_pval01.pdf")
-# note 'p.value' is the cutoff value for adjusted p-values
-newcol=brewer.pal(n=12,"Paired")
-topTable <- topTable(efit, coef=1, n=Inf, p.value=0.01)
-plot(density(topTable$logFC), col=newcol[1], xlim=c(-2,2), main="LogFC Density", xlab="LogFC", ylab="Density", lwd=6)
-abline(v=c(-1,-0.5,0.5,1), lty=3)
-counter=1
-for (i in 2:ncol(efit)){
-	counter=counter+1
-    topTable <- topTable(efit, coef=i, n=Inf, p.value=0.01)
-    lines(density(topTable$logFC), col=newcol[counter], xlim=c(-2,2), lwd=6)
-}
-legend(x="topright", bty="n", col=newcol[1:ncol(efit)], legend=colnames(efit), lty=1, lwd=6)
-dev.off()
 
 # We can also look at the top ten DE genes with a heatmap of logCPM values for the top 100 genes. Each gene (or row) is scaled so that mean expression is zero and the standard deviation is one (we're using 'E' from the voom object which is a numeric matrix of normalized expression values on the log2 scale). Samples with relatively high expression of a given gene are marked in red and samples with relatively low expression are marked in blue. Lighter shades and white represent genes with intermediate expression levels. Samples and genes are reordered by the method of hierarchical clustering
 # first, make a heatmap of all top genes in one pdf
 
 # reset ensemble row names to gene symbols
-rownames(v$E)=v$genes$SYMBOL
+rownames(vDup$E)=v$genes$SYMBOL
 
 # set up annotation
 col_fun = colorRamp2(c(-4, 0, 4), c("blue", "white", "red"))
@@ -329,10 +492,16 @@ for (i1 in village1){
 }
 
 # Look at which genes are in common using UpsetR
-pdf("UpsetR_SamplingSiteComparison.pdf")
-upset(as.data.frame(abs(dt)), sets = c("ANKvsMDB" ,"ANKvsMPI", "ANKvsTLL", "ANKvsWNG", "MDBvsMPI", "MDBvsTLL", "MDBvsWNG", "MPIvsTLL", "MPIvsWNG", "TLLvsWNG"), sets.bar.color = "#56B4E9", nintersects=100, keep.order=TRUE)
-dev.off()
 
+byVillages <- decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01)
+byVillages05 <- decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=0.5)
+byVillages1 <- decideTests(voomDupEfit, method="separate", adjust.method = "BH", p.value = 0.01, lfc=1)
+
+pdf(paste0(outputdir, "UpsetR_SamplingSiteComparison_by_village_allfcs.pdf"), width=12)
+    upset(as.data.frame(abs(byVillages)), sets = c("ANKvsMDB", "ANKvsTLL", "WNGvsMDB", "WNGvsTLL", "ANKvsMPI", "WNGvsMPI", "MDBvsMPI", "TLLvsMPI", "ANKvsWNG", "MDBvsTLL"), sets.bar.color = c(rep(smb_mtw,4), rep(smb_mpi, 2), rep(mtw_mpi, 2), sumba, mentawai), nintersects=50,  order.by = "freq", keep.order=T)
+    upset(as.data.frame(abs(byVillages05)), sets = c("ANKvsMDB", "ANKvsTLL", "WNGvsMDB", "WNGvsTLL", "ANKvsMPI", "WNGvsMPI", "MDBvsMPI", "TLLvsMPI", "ANKvsWNG", "MDBvsTLL"), sets.bar.color = c(rep(smb_mtw,4), rep(smb_mpi, 2), rep(mtw_mpi, 2), sumba, mentawai), nintersects=50,  order.by = "freq", keep.order=T)
+    upset(as.data.frame(abs(byVillages1)), sets = c("ANKvsMDB", "ANKvsTLL", "WNGvsMDB", "WNGvsTLL", "ANKvsMPI", "WNGvsMPI", "MDBvsMPI", "TLLvsMPI", "ANKvsWNG", "MDBvsTLL"), sets.bar.color = c(rep(smb_mtw,4), rep(smb_mpi, 2), rep(mtw_mpi, 2), sumba, mentawai), nintersects=50,  order.by = "freq", keep.order=T)
+dev.off()
 
 # Check which genes are shared within villages -----------------------------------------------------------------------------------------
 

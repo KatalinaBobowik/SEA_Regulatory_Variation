@@ -23,6 +23,7 @@ library(dendextend)
 library(reshape2)
 library(car)
 library(sva)
+library(wesanderson)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
@@ -40,6 +41,7 @@ palette(c(wes, brewer.pal(8,"Dark2")))
 dev.off()
 # set up colour palette for batch
 batch.col=electronic_night(n=3)
+village.col=c("#EBCC2A","chocolate","chocolate","#3B9AB2","#F21A00","chocolate","chocolate","#FD6467","#78B7C5","orange","chocolate")
 
 # BEGIN ANALYSIS -------------------------------------------------------------------------------------------------
 
@@ -119,9 +121,9 @@ plot.pca <- function(dataToPca, speciesCol, namesPch, sampleNames){
         plot(pca$x[,pca_axis1], pca$x[,pca_axis2], col=speciesCol, pch=namesPch, cex=2, xlab=paste0("PC", pca_axis1, " (", round(pca.var[pca_axis1]*100, digits=2), "% of variance)"), ylab=paste0("PC", pca_axis2, " (", round(pca.var[pca_axis2]*100, digits=2), "% of variance)", sep=""), main=name)
         points(pca$x[,pca_axis1][which(allreplicated==T)], pca$x[,pca_axis2][which(allreplicated==T)], col="black", pch=8, cex=2)
         text(pca$x[,pca_axis1][which(allreplicated==T)], pca$x[,pca_axis2][which(allreplicated==T)], labels=samplenames[which(allreplicated==T)], pos=3)
-        #legend(legend=unique(sampleNames), pch=16, x="bottomright", col=unique(speciesCol), cex=0.6, title=name, border=F, bty="n")
-        #legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
-    }
+        legend(legend=unique(sampleNames), pch=16, x="bottomright", col=unique(speciesCol), cex=0.6, title=name, border=F, bty="n")
+        legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
+        }
 
     return(pca)
 }
@@ -152,14 +154,20 @@ all.covars.df <- y$samples[,covariate.names]
 
 # Plot PCA
 for (name in factorVariables){
-  if (nlevels(get(name)) < 26){
-    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
-    pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=as.numeric(get(name)),namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
-    dev.off()
-  } else {
-    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
-    pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=as.numeric(get(name)),namesPch=20,sampleNames=get(name))
-    dev.off()
+    if (name=="Sampling.Site"){
+        pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
+        pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=village.col[as.numeric(get(name))],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))   
+        dev.off()
+    }
+    if (name!="Sampling.Site" & nlevels(get(name)) < 26){
+        pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
+        pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=as.numeric(get(name)),namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
+        dev.off()
+    } 
+    if (nlevels(get(name)) > 26){
+        pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
+        pcaresults <- plot.pca(dataToPca=lcpm, speciesCol=as.numeric(get(name)),namesPch=20,sampleNames=get(name))
+        dev.off()
   }
 }
 
@@ -283,7 +291,7 @@ for (method in c("spearman", "pearson")){
         }
     }
     boxplot(interIsland, main=paste("Inter-Island Variation",method,sep="\n"))
-    stripchart(interIsland, vertical=T, method = "jitter", add = TRUE, pch = 20, cex=2, col=c(4,5,7))
+    stripchart(interIsland, vertical=T, method = "jitter", add = TRUE, pch = 20, cex=2, col=c(9,11,10))
     #sapply(1:3, function(x) text(x=x, y=variation[[x]][,3], labels=as.character(variation[[x]][1:nrow(variation[[x]]),4]), cex=0.8, pos=1))
 
    # melt all three dataframes
@@ -319,7 +327,7 @@ write.table(pca.outliers.final, file=paste0(outputdir,"sample_outliersInPCA.txt"
 
 # Analyse what might be driving variation
 pdf(paste0(outputdir,"CovariateOutliers_SamplingSite.pdf"), height=10, width=15)
-for (covariate in colnames(y$samples)[c(3,10,13,16:21)]){
+for (covariate in colnames(y$samples[,covariate.names])){
     Boxplot(get(covariate)~Island,data=y$samples, main=covariate, col=1:5)
 }
 dev.off()

@@ -37,6 +37,7 @@ wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467
 palette(c(wes, brewer.pal(8,"Dark2")))
 # set up colour palette for batch
 batch.col=electronic_night(n=3)
+village.col=c("#EBCC2A","chocolate","chocolate","#3B9AB2","#F21A00","chocolate","chocolate","chocolate","#78B7C5","orange","chocolate")
 dev.off()
 
 # BEGIN ANALYSIS -------------------------------------------------------------------------------------------------
@@ -332,7 +333,9 @@ plot.pca <- function(dataToPca, speciesCol, namesPch, sampleNames){
         plot(pca$x[,pca_axis1], pca$x[,pca_axis2], col=speciesCol, pch=namesPch, cex=2, xlab=paste0("PC", pca_axis1, " (", round(pca.var[pca_axis1]*100, digits=2), "% of variance)"), ylab=paste0("PC", pca_axis2, " (", round(pca.var[pca_axis2]*100, digits=2), "% of variance)", sep=""), main=name)
         # points(pca$x[,pca_axis1][which(allreplicated==T)], pca$x[,pca_axis2][which(allreplicated==T)], col="black", pch=8, cex=2)
         # text(pca$x[,pca_axis1][which(allreplicated==T)], pca$x[,pca_axis2][which(allreplicated==T)], labels=samplenames[which(allreplicated==T)], pos=3)
-        legend(legend=unique(sampleNames), pch=16, x="bottomright", col=unique(speciesCol), cex=0.6, title=name, border=F, bty="n")
+        #legend(legend=unique(sampleNames), pch=16, x="bottomright", col=speciesCol[unique(as.numeric(get(name)))], cex=0.6, title=name, border=F, bty="n")
+        #legend(legend=unique(sampleNames), pch=16, x="bottomright", col=unique(speciesCol), cex=0.6, title=name, border=F, bty="n")
+        legend(legend=unique(sampleNames), pch=16, x="bottomright", col=village.col[unique(as.numeric(get(name)))], cex=0.6, title=name, border=F, bty="n")
         legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
     }
 
@@ -363,20 +366,27 @@ all.covars.df <- y$samples[,covariate.names]
 
 # Plot PCA
 for (name in factorVariables){
-  if (nlevels(get(name)) < 26){
-    pdf(paste0(outputdir,"pcaresults_",name,".pdf"))
-    pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=as.numeric(get(name)),namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
-    dev.off()
-  } else {
-    pdf(paste0(outputdir,"pcaresults_",name,"_RemoveBatchEffect.pdf"))
-    pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=as.numeric(get(name)),namesPch=20,sampleNames=get(name))
-    dev.off()
-  }
+    if (name=="Sampling.Site"){
+        pdf(paste0(outputdir,"pcaresults_",name,"_RemoveBatchEffect.pdf"))
+        pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=village.col[as.numeric(get(name))],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
+        legend(legend=unique(sampleNames), pch=16, x="bottomright", col=village.col[unique(as.numeric(get(name)))], cex=0.6, title=name, border=F, bty="n")
+        dev.off()
+    }
+    if (name!="Sampling.Site" & nlevels(get(name)) < 26){
+        pdf(paste0(outputdir,"pcaresults_",name,"_RemoveBatchEffect.pdf"))
+        pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=as.numeric(get(name)),namesPch=as.numeric(y$samples$batch) + 14,sampleNames=get(name))
+        dev.off()
+    }
+    if (nlevels(get(name)) > 26){
+        pdf(paste0(outputdir,"pcaresults_",name,"_RemoveBatchEffect.pdf"))
+        pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=as.numeric(get(name)),namesPch=20,sampleNames=get(name))
+        dev.off()
+    }
 }
 
 # plot batch
-pdf(paste0(outputdir,"pcaresults_batch.pdf"))
 name="batch"
+pdf(paste0(outputdir,"pcaresults_",name,"_RemoveBatchEffect.pdf"))
 pcaresults <- plot.pca(dataToPca=batch.corrected.lcpm, speciesCol=batch.col[as.numeric(batch)],namesPch=as.numeric(y$samples$batch) + 14,sampleNames=batch)
 dev.off()
   
@@ -390,6 +400,19 @@ for (name in numericVariables){
     legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
     dev.off()
 }
+
+# plot sampling site and island side by side
+pdf(paste0(outputdir,"samplingsiteAndVillagePCA.pdf"), height=8,width=15)
+par(mfrow=c(1,2))
+pca <- prcomp(t(batch.corrected.lcpm), scale=T, center=T)
+pca.var <- pca$sdev^2/sum(pca$sdev^2)
+plot(pca$x[,1], pca$x[,2], col=village.col[as.numeric(get(name))], pch=as.numeric(y$samples$batch) + 14, cex=2, xlab=paste0("PC 1", " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC 2", " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""), main="Village")
+legend(legend=unique(Sampling.Site), pch=16, x="bottomright", col=village.col[unique(as.numeric(get(name)))], cex=0.6, title="Village", border=F, bty="n")
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
+plot(pca$x[,1], pca$x[,2], col=as.numeric(Island), pch=as.numeric(y$samples$batch) + 14, cex=2, xlab=paste0("PC 1", " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC 2", " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""), main="Island")
+legend(legend=unique(Island), pch=16, x="bottomright", col=unique(as.numeric(Island)), cex=0.6, title="Village", border=F, bty="n")
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
+dev.off()
 
 # Get PCA associations
 all.pcs <- pc.assoc(pcaresults)
