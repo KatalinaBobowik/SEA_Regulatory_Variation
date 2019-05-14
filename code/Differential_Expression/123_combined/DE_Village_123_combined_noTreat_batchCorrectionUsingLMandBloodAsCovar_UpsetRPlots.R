@@ -41,6 +41,10 @@ smb_mtw <- wes_palette("Darjeeling1", 9, type = "continuous")[3]
 smb_mpi <- wes_palette("Darjeeling1", 9, type = "continuous")[7]
 mtw_mpi <- "darkorchid4"
 
+# set up colour palette for batch
+batch.col=electronic_night(n=3)
+village.col=c("#EBCC2A","chocolate","chocolate","#3B9AB2","#F21A00","chocolate","chocolate","chocolate","#78B7C5","orange","chocolate")
+
 dev.off()
 
 
@@ -401,20 +405,6 @@ dev.off()
 
 # Summary and visualisation of gene trends ---------------------------------------------------------------------------
 
-# first see which logFC threshold is best
-logFC.df=matrix(nrow=3,ncol=ncol(efit))
-colnames(logFC.df)=colnames(efit)
-counter=0
-for (number in c(0,0.5,1)){
-    counter=counter+1
-    dt <- decideTests(efit, p.value=0.01, lfc=number)
-    values=summary(abs(dt))[3,]
-    logFC.df[counter,]=values
-}
-# add in column specifying logFC
-logFC.df=cbind(logFC = c(0,0.5,1), logFC.df)
-write.table(logFC.df, file="logFC_thresholds.txt", sep="\t", quote=F)
-
 dt <- decideTests(efit, p.value=0.01, lfc=1)
 
 # plot log2 fold change between islands
@@ -503,15 +493,19 @@ pdf(paste0(outputdir, "UpsetR_SamplingSiteComparison_by_village_allfcs.pdf"), wi
     upset(as.data.frame(abs(byVillages1)), sets = c("ANKvsMDB", "ANKvsTLL", "WNGvsMDB", "WNGvsTLL", "ANKvsMPI", "WNGvsMPI", "MDBvsMPI", "TLLvsMPI", "ANKvsWNG", "MDBvsTLL"), sets.bar.color = c(rep(smb_mtw,4), rep(smb_mpi, 2), rep(mtw_mpi, 2), sumba, mentawai), nintersects=50,  order.by = "freq", keep.order=T)
 dev.off()
 
-# Check which genes are shared within villages -----------------------------------------------------------------------------------------
-
-# Sumba villages=ANK and WNG; Mentawai villages= TLL and MDB. MDB vs TLL= 0 significant genes. ANK vs WNG = 2 significant genes. Which ones are these?
-
-topTable <- topTable(efit, coef=4, p.value=0.01, lfc=1, n=Inf, sort.by="p")
-rownames(topTable)
-# "ENSG00000251002" "ENSG00000131203"
-# ENSG00000251002 doesn't have a gene name associated with it, but according to Genecards, "it is an RNA Gene". That's about as much information as I could get...
-# The other significant gene is ENSG00000131203, which is equivalent to IDO1. According to Genecards, "IDO1 (Indoleamine 2,3-Dioxygenase 1) is a Protein Coding gene. Diseases associated with IDO1 include Chlamydia and Listeriosis. Among its related pathways are Histidine, lysine, phenylalanine, tyrosine, proline and tryptophan catabolism and NF-kappaB Signaling. Gene Ontology (GO) annotations related to this gene include heme binding and tryptophan 2,3-dioxygenase activity."
+# first see which logFC threshold is best
+logFC.df=matrix(nrow=3,ncol=ncol(efit))
+colnames(logFC.df)=colnames(efit)
+counter=0
+for (number in c(0,0.5,1)){
+    counter=counter+1
+    dt <- decideTests(efit, p.value=0.01, lfc=number)
+    values=summary(abs(dt))[3,]
+    logFC.df[counter,]=values
+}
+# add in column specifying logFC
+logFC.df=cbind(logFC = c(0,0.5,1), logFC.df)
+write.table(logFC.df, file="logFC_thresholds.txt", sep="\t", quote=F)
 
 
 

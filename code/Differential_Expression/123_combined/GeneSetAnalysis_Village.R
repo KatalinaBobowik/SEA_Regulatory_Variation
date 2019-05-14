@@ -37,26 +37,27 @@ dev.off()
 # load y, the normalised and filtered counts object
 load(paste0(inputdir, "dataPreprocessing/indoRNA.read_counts.TMM.filtered.Rda"))
 # load in the efit object
-load(paste0(inputdir, "DE_Island/LM_allCovarPlusBlood/voomDupEfit.Rda"))
+load(paste0(inputdir, "DE_Village/voomDupEfit_Village.Rda"))
 # load in the voom object
-load(paste0(inputdir, "DE_Island/LM_allCovarPlusBlood/vDup.Rda"))
+load(paste0(inputdir, "DE_Village/vDup_Village.Rda"))
 
 # set up design matrix ----------------------------------------------------------------------------------------
 
-# We don't know what the age is for SMB-PTB028 (#116) so we will just add in the median age of Sumba (44.5)
-y$samples$Age[which(is.na(y$samples$Age) == T)]=45
+# remove Bilarenge, Hupu Mada, Padira Tana, Patiala Bawa, Rindi, and Wura Homba
+y=y[,-grep("Bilarenge|Hupu Mada|Padira Tana|Patiala Bawa|Rindi|Wura Homba", y$samples$Sampling.Site)]
+# drop unused levels
+y$samples=droplevels(y$samples)
 
-# Set up design matrix
-design <- model.matrix(~0 + y$samples$Island + y$samples$Age + y$samples$batch + y$samples$RIN + y$samples$CD8T + y$samples$CD4T + y$samples$NK + y$samples$Bcell + y$samples$Mono + y$samples$Gran)
-colnames(design)=gsub("Island", "", colnames(design))
-
-# rename columns to exclude spaces and unrecognised characters
+# set up designs
+design <- model.matrix(~0 + y$samples$Sampling.Site + y$samples$Age + y$samples$batch + y$samples$RIN + y$samples$CD8T + y$samples$CD4T + y$samples$NK + y$samples$Bcell + y$samples$Mono + y$samples$Gran)
+# Get rid of 'Sampling Site' and 'y$samples' from column names
+colnames(design)=gsub("Sampling.Site", "", colnames(design))
 colnames(design)=gsub("[\\y$]", "", colnames(design))
 colnames(design)=gsub("samples", "", colnames(design))
-colnames(design)=gsub("West Papua", "Mappi", colnames(design))
 
 # set up contrast matrix
-contr.matrix <- makeContrasts(SMBvsMTW=Sumba - Mentawai, SMBvsMPI=Sumba - Mappi, MTWvsMPI=Mentawai - Mappi, levels=colnames(design))
+#contr.matrix <- makeContrasts(ANKvsMDB=Anakalung-Madobag, ANKvsMPI=Anakalung-Mappi, ANKvsTLL=Anakalung-Taileleu, ANKvsWNG=Anakalung-Wunga, MDBvsMPI=Madobag-Mappi, MDBvsTLL=Madobag-Taileleu, MDBvsWNG=Madobag-Wunga, MPIvsTLL=Mappi-Taileleu, MPIvsWNG=Mappi-Wunga, TLLvsWNG=Taileleu-Wunga, levels=colnames(design))
+contr.matrix <- makeContrasts(ANKvsMDB=Anakalung-Madobag, ANKvsMPI=Anakalung-Mappi, ANKvsTLL=Anakalung-Taileleu, ANKvsWNG=Anakalung-Wunga, MDBvsMPI=Madobag-Mappi, MDBvsTLL=Madobag-Taileleu, WNGvsMDB=Wunga-Madobag, TLLvsMPI=Taileleu-Mappi, WNGvsMPI=Wunga-Mappi, WNGvsTLL=Wunga-Taileleu, levels=colnames(design)) # Contrasts are ordered in the same order as the island ones, in case we want to look at directional effects
 
 # Enrichment analysis for Gene Ontology ----------------------------------------------------------------------------------------------------
 
@@ -127,9 +128,9 @@ for(pop in 1:ncol(voomDupEfit)){
 # First save  output (remember that SMBvsMTW has no significantly enriched GO pathways so we'll only do this for SMBvsMPI and MTWvsMPI)  
 
 # Revigo for MTW vs MPI (pval of 0.01 and LFC of 0.05 FDR)
-source(paste0(revigodir,"REVIGO_MTWvsMPI_LFC05_Pval01.r"))
+#source(paste0(revigodir,"REVIGO_MTWvsMPI_LFC05_Pval01.r"))
 # SMB vs MPI
-source(paste0(revigodir,"REVIGO_SMBvsMPI_LFC05_Pval01.r"))
+#source(paste0(revigodir,"REVIGO_SMBvsMPI_LFC05_Pval01.r"))
 
 
 # EGSEA -----------------------------------------------------------------------
