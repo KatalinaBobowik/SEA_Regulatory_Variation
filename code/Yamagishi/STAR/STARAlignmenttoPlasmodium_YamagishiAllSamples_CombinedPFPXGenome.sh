@@ -17,8 +17,8 @@ cat ${genomeDir}/PlasmoDB_36_Pfalciparum3D7_Genome.fasta ${genomeDir}/PlasmoDB_3
 # the '--sjdbGTFtagExonParentTranscript Parent' flag makes STAR work with gff files
 STAR --runMode genomeGenerate --genomeDir ${mainDir}/STAR/Yamagishi_CombinedPFPX --genomeFastaFiles ${genomeDir}/combined_PFalc3D7_PvivaxP01_Genome.fasta --sjdbGTFfile ${genomeDir}/combined_PFalc3D7_PvivaxP01_GFF.gff --sjdbOverhang 35 --runThreadN 12 --sjdbGTFtagExonParentTranscript Parent
 
-# First Pass - yamagishi
-for file in ${star}/Yamagishi/{Controls,Sick}/*.fastq; do
+# First Pass- map all unmapped reads from yamagishi study
+for file in ${star}/Yamagishi/{Controls,Sick}/unmapped*.fastq; do
   sample=`basename $file _trimmed.fastq.gz`
   healthStatus=`echo $file | cut -d/ -f 9`
   if [[ $healthStatus == "Controls" ]]; then

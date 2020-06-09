@@ -65,7 +65,7 @@ ensembl.mart.90 <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset='hsapiens_gen
 
 # transform ensembl IDs to entrez IDs to be compatible with human c2 dataset (below)
 ensembl_genes=rownames(y)
-entrez=getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id", "entrezgene", "description"),values= ensembl_genes,mart=ensembl.mart.90)
+entrez=getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id", "entrezgene_id", "description"),values= ensembl_genes,mart=ensembl.mart.90)
 y$entrezID=entrez[match(rownames(y), entrez[,1]), 2]
 
 # gene set testing with Camera

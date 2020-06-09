@@ -47,7 +47,7 @@ names2nd <- paste(sapply(strsplit(basename(files.secondbatch), "[_.]"), `[`, 9),
 names3rd <- paste(sapply(strsplit(basename(files.thirdbatch), "[_.]"), `[`, 7), "thirdBatch", sep="_")
 
 row.names(indoReads) <- featureCountsOut[[1]]$Geneid
-names(indoReads) <- c(names1st, names2nd, names3rd) #need to manually confirm ordering --> KB: what do you mean by this?
+names(indoReads) <- c(names1st, names2nd, names3rd) 
 
 # rename MPI-336 to MPI-381 (mixup in naming when perfomring sequencing)
 colnames(indoReads) <- gsub("MPI-336_thirdBatch", "MPI-381_thirdBatch", colnames(indoReads)) 
@@ -62,7 +62,7 @@ samplenames <- sapply(strsplit(samplenames, "[_.]"), `[`, 1)
 
 rm(featureCountsOut) # clean up, big object
 
-# Organise gene annotation using biomart
+# Organise gene annotation
 geneid <- rownames(y)
 # Check for and remove duplicated gene IDs, then add genes dataframe to DGEList object
 genes <- select(Homo.sapiens, keys=geneid, columns=c("SYMBOL", "TXCHROM"), keytype="ENSEMBL")

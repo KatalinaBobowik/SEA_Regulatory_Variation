@@ -18,8 +18,8 @@ STAR --runMode genomeGenerate --genomeDir ${mainDir}/STAR/IndoRNA_CombinedPFPX -
 cut -f 4,5 ${genomeDir}/combined_PFalc3D7_PvivaxP01_GFF.gff | awk '{a=$2-$1;print a;}' | awk 'BEGIN{a=0}{if ($1>0+a) a=$1} END{print a}'
 # 34385
 
-# First Pass- align all human reads from the trimmomatic output to the Plasmodium falciparum genome
-for file in ${star}/{sample_output,second_batch/sample_output,third_batch/sample_output}/R1_*.fastq; do
+# First Pass- align all unmapped human reads from the trimmomatic output to the Plasmodium falciparum genome
+for file in ${star}/{sample_output,second_batch/sample_output,third_batch/sample_output}/R1_unmapped*.fastq; do
 	readDir=`dirname $file`
 	batch=`echo $file | cut -d/ -f 8`
 	# the first batch of sequences isn't labelled as 'first batch' (in the 7th field separator) so we need to add this information in. 

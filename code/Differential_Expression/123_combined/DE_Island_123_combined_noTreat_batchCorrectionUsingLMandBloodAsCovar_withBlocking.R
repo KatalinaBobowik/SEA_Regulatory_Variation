@@ -20,6 +20,7 @@ library(gplots)
 library(circlize)
 library(ComplexHeatmap)
 library(EnsDb.Hsapiens.v86)
+library(statmod)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
@@ -160,8 +161,11 @@ save(voomDupEfit, file = paste0(outputdir, "voomDupEfit.Rda"))
 
 # get top genes using toptable
 voomDupTopTableSMB.MTW <- topTable(voomDupEfit, coef=1, p.value=0.01, n=Inf, sort.by="p")
+write.table(voomDupTopTableSMB.MTW , file=paste0(outputdir,"topTable_SMBvsMTW.txt"))
 voomDupTopTableSMB.MPI <- topTable(voomDupEfit, coef=2, p.value=0.01, n=Inf, sort.by="p")
+write.table(voomDupTopTableSMB.MPI , file=paste0(outputdir,"topTable_SMBvsMPI.txt"))
 voomDupTopTableMTW.MPI <- topTable(voomDupEfit, coef=3, p.value=0.01, n=Inf, sort.by="p")
+write.table(voomDupTopTableMTW.MPI , file=paste0(outputdir,"topTable_MTWvsMPI.txt"))
 
 # get number of DE genes at differnet thresholds
 # noLFC
@@ -403,15 +407,15 @@ for (name in numericVariables){
 
 # plot sampling site and island side by side
 pdf(paste0(outputdir,"samplingsiteAndVillagePCA.pdf"), height=8,width=15)
-par(mfrow=c(1,2))
+par(mfrow=c(1,2), mar=c(5,5,5,5))
 pca <- prcomp(t(batch.corrected.lcpm), scale=T, center=T)
 pca.var <- pca$sdev^2/sum(pca$sdev^2)
-plot(pca$x[,1], pca$x[,2], col=village.col[as.numeric(get(name))], pch=as.numeric(y$samples$batch) + 14, cex=2, xlab=paste0("PC 1", " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC 2", " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""), main="Village")
-legend(legend=unique(Sampling.Site), pch=16, x="bottomright", col=village.col[unique(as.numeric(get(name)))], cex=0.6, title="Village", border=F, bty="n")
-legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
-plot(pca$x[,1], pca$x[,2], col=as.numeric(Island), pch=as.numeric(y$samples$batch) + 14, cex=2, xlab=paste0("PC 1", " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC 2", " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""), main="Island")
-legend(legend=unique(Island), pch=16, x="bottomright", col=unique(as.numeric(Island)), cex=0.6, title="Village", border=F, bty="n")
-legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=0.6, border=F, bty="n")
+plot(pca$x[,1], pca$x[,2], col=village.col[as.numeric(Sampling.Site)], pch=as.numeric(y$samples$batch) + 14, cex=2, xlab=paste0("PC 1", " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC 2", " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""), main="Village", cex.main=2, cex.lab=1.5, cex.axis=1.5)
+legend(legend=unique(Sampling.Site), pch=16, x="bottomleft", col=village.col[unique(as.numeric(Sampling.Site))], cex=1.2, title="Village", border=F, bty="n")
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=1.2, border=F, bty="n")
+plot(pca$x[,1], pca$x[,2], col=as.numeric(Island), pch=as.numeric(y$samples$batch) + 14, cex=2, xlab=paste0("PC 1", " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC 2", " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""), main="Island", cex.main=2, cex.lab=1.5, cex.axis=1.5)
+legend(legend=unique(Island), pch=16, x="bottomleft", col=unique(as.numeric(Island)), cex=1.2, title="Village", border=F, bty="n")
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=unique(as.numeric(y$samples$batch)) + 14, title="Batch", cex=1.2, border=F, bty="n")
 dev.off()
 
 # Get PCA associations
@@ -472,7 +476,7 @@ df1=data.frame(island = as.character(Island))
 df2=data.frame(batch = as.numeric(batch))
 ha1 = HeatmapAnnotation(df = df1, col = list(island = c("Mentawai" =  1, "Sumba" = 2, "West Papua" = 3)))
 
-pdf(paste0(outputdir,"HeatmapAllPops_dupCor.pdf"), height=12, width=15)
+pdf(paste0(outputdir,"HeatmapAllPops_dupCor.pdf"), height=7, width=9)
 # We can also make individual pdfs of the top genes
 island1=c("Sumba","Mentawai","West Papua")
 island2=c("Sumba","Mentawai","West Papua")
@@ -501,7 +505,7 @@ for (i1 in island1){
         transformedHeatmap=t(scale(t(vDup$E[index,])))[,grep(paste(i1,i2,sep="|"), Island)]
         genesymbol <- select(edb, keys=rownames(transformedHeatmap), columns=c("SYMBOL"), keytype="GENEID")$SYMBOL
         rownames(transformedHeatmap)=genesymbol
-        draw(Heatmap(transformedHeatmap, col=col_fun, column_title = colnames(voomDupEfit)[counter], top_annotation = ha, show_row_names = T, show_heatmap_legend = F, show_column_names = F, name = "Z-Score"),show_annotation_legend = TRUE,newpage=F)
+        draw(Heatmap(transformedHeatmap, col=col_fun, column_title = colnames(voomDupEfit)[counter], top_annotation = ha, show_row_names = T, show_heatmap_legend = F, show_column_names = F, name = "Z-Score"),show_annotation_legend = F,newpage=F)
         upViewport()
     }
 }
@@ -516,10 +520,9 @@ upViewport()
 dev.off()
 
 # show the number of DE genes between all islands
-pdf(paste0(outputdir,"vennDiagram_allSigDEGenes_pval01_FDR1_dupCor.pdf"), height=15, width=15)
-vennDiagram(dt[,1:3], circle.col=c(9,10,11))
+pdf(paste0(outputdir,"vennDiagram_allSigDEGenes_pval01_dupCor.pdf"))
+vennDiagram(dt[,1:3], circle.col=standard_col[c(5,6,7)])
 dev.off()
-
 
 # get DE genes in common with populations compared to Mappi, i.e., SMBvsMPI and MTWvsMPI (since we think this is an interesting island comparison)
 rownames(voomDupEfit$genes)=voomDupEfit$genes$ENSEMBL

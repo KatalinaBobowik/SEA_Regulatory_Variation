@@ -215,7 +215,7 @@ eucl.distance <- dist(t(lcpm), method = "euclidean")
 eucl.cluster <- hclust(eucl.distance, method = "complete")
 dend.eucl=as.dendrogram(eucl.cluster)
 labels_colors(dend.eucl)=as.numeric(Island)[order.dendrogram(dend.eucl)]
-plot(dend.eucl, main="log2-CPM \n Euclidean Distances")
+plot(dend.eucl, main="log2-CPM \n Euclidean Distances", cex.main=2, cex.axis=1.5)
 dev.off()
 
 # Heatmap of lcpm distances
@@ -248,8 +248,8 @@ for (method in c("spearman", "pearson")){
         allCPM$value[duplicated(allCPM$value)]=NA
         withinVillage[[sample]]=allCPM[,3]
     }
-    pdf(paste0(outputdir,"IslandVariation_",method,".pdf"),height=15, width=15)
-    par(mai=rep(0.5, 4))
+    pdf(paste0(outputdir,"IslandVariation_",method,".pdf"),height=14, width=14)
+    par(mai=rep(0.5, 4), mar=c(5,7,6,5))
     layout(matrix(c(1,2,3,3), ncol = 2, byrow = TRUE))
     withinIsland=list()
     variation=list()
@@ -264,7 +264,7 @@ for (method in c("spearman", "pearson")){
             variation[[sample]]=transform(sampVar, names=paste(sapply(strsplit(as.character(sampVar[,1]),"[-.]"), `[`, 3), sapply(strsplit(as.character(sampVar[,2]),"[-.]"), `[`, 3), sep="vs"))
         }
     }
-    boxplot(withinIsland, main=paste("Within-Island Variation",method,sep="\n"))
+    boxplot(withinIsland, main=paste("Within-Island Variation",method,sep="\n"), cex.main=2, cex.lab=1.5, cex.axis=1.7)
     stripchart(withinIsland, vertical=T, method = "jitter", add = TRUE, pch = 20, cex=2, col=c(1,2,3))
     # sapply(1:2, function(x) text(x=x, y=variation[[x]][,3], labels=as.character(variation[[x]][1:nrow(variation[[x]]),4]), cex=0.8, pos=1))
         
@@ -290,7 +290,7 @@ for (method in c("spearman", "pearson")){
             }
         }
     }
-    boxplot(interIsland, main=paste("Inter-Island Variation",method,sep="\n"))
+    boxplot(interIsland, main=paste("Inter-Island Variation",method,sep="\n"), cex.main=2, cex.lab=1.5, cex.axis=1.5)
     stripchart(interIsland, vertical=T, method = "jitter", add = TRUE, pch = 20, cex=2, col=c(9,11,10))
     #sapply(1:3, function(x) text(x=x, y=variation[[x]][,3], labels=as.character(variation[[x]][1:nrow(variation[[x]]),4]), cex=0.8, pos=1))
 
@@ -301,7 +301,7 @@ for (method in c("spearman", "pearson")){
 
     meta=list(withinVillage.melt, withinIsland.melt, interIsland.melt)
     names(meta)=c("withinVillage", "withinIsland", "interIsland")
-    boxplot(meta, main=paste("Sample Correlation",method,sep="\n"))
+    boxplot(meta, main=paste("Sample Correlation",method,sep="\n"), cex.main=2, cex.lab=1.5, cex.axis=1.7)
     dev.off()
 }
 

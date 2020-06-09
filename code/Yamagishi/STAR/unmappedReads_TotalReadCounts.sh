@@ -20,6 +20,7 @@ for file in ${dir}/STAR/Hg38_SecondPass/Yamagishi/{Controls,Sick}/unmapped*.bam;
 	# ${variable##pattern} is like $variable, minus the longest matching pattern from front-end
 	sampleID=${shortenedFile##*_}
 	healthStatusPlusID="${sampleID}_${healthStatus}"
-	samtools view $file | echo $healthStatusPlusID `expr $(wc -l) / 2` >> ${dir}/STAR/unmappedReads_Hg38/unmappedReads_Counts_Yamagishi.txt
+	# now we just need to count the number of lines. Counting the number of lines tells us how many unnmapped reads we have. Since this is single-end data, we don't need to divide by 2 
+	samtools view $file | echo $healthStatusPlusID `expr $(wc -l)` >> ${dir}/STAR/unmappedReads_Hg38/unmappedReads_Counts_Yamagishi.txt
 	echo ${sampleID} done
 done

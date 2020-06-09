@@ -127,7 +127,7 @@ contr.matrix <- makeContrasts(SMBvsMTW=Sumba - Mentawai, SMBvsMPI=Sumba - Mappi,
 # now run voom and see how it performs
 pdf(paste0(outputdir,"Limma_voom_upperquartilenormalisation.pdf", height=8, width=15))
 par(mfrow = c(1,2))
-v <- voom(z, design, plot=TRUE)
+v <- voom(z, design, plot=TRUE, cex.main=2, cex.axis=1.7, cex.lab=1.7)
 
 # create a new variable for blocking using sample IDs
 z$samples$ind <- samplenames
@@ -145,7 +145,7 @@ median(v$weights) # another sanity check:
 # The  vector y$samples$ind indicates the  two  blocks  corresponding  to  biological  replicates
 pdf(paste0(outputdir,"RUV_voomDuplicateCorrelation.pdf"), height=8, width=12)
 par(mfrow=c(1,2))
-vDup <- voom(z, design, plot=TRUE, block=z$samples$ind, correlation=dupcor$consensus)
+vDup <- voom(z, design, plot=TRUE, block=z$samples$ind, correlation=dupcor$consensus, cex.main=2, cex.axis=1.7, cex.lab=1.7)
 dupcor <- duplicateCorrelation(vDup, design, block=z$samples$ind) # get warning message: Too much damping - convergence tolerance not achievable
 dupcor$consensus # sanity check pt 2
 # [1] 0.2866048

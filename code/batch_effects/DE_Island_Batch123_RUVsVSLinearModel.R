@@ -280,18 +280,18 @@ all.covars.df <- y$samples[,covariate.names]
 one.dimension=function(data) {
     pca <- prcomp(t(data), scale=T, center=T)
     pca.var <- pca$sdev^2/sum(pca$sdev^2)
-    plot(pca$x[,1], pca$x[,2], col=batch.col[as.numeric(batch)], pch=as.numeric(y$samples$batch) + 14, cex=2, xlab=paste0("PC", 1, " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC", 2, " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""))
-    legend(legend=unique(batch), pch=unique(as.numeric(y$samples$batch)) + 14, x="bottomright", col=unique(batch.col[as.numeric(batch)]), cex=0.6, title="batch", border=F, bty="n")
+    plot(pca$x[,1], pca$x[,2], col=batch.col[as.numeric(batch)], pch=as.numeric(y$samples$batch) + 14, cex=2, cex.lab=1.8, cex.axis=1.8, xlab=paste0("PC", 1, " (", round(pca.var[1]*100, digits=2), "% of variance)"), ylab=paste0("PC", 2, " (", round(pca.var[2]*100, digits=2), "% of variance)", sep=""))
+    legend(legend=unique(batch), pch=unique(as.numeric(y$samples$batch)) + 14, x="bottomright", col=unique(batch.col[as.numeric(batch)]), cex=1.4, title="batch", border=F, bty="n")
 }
 
 # Compare the first PCA of the LM-corrected method to the RUVs corrected method
 pdf(paste0(outputdir,"PCA_RUVvsLM_FirstDimension.pdf"), height=8, width=15)
-par(mfrow=c(1,2))
+par(mfrow=c(1,2), mar=c(5,7,5,1))
 one.dimension(batch.corrected.lcpm)
-title("Limma-LM")
+title("Limma-LM", cex.main=2)
 # here, we're looking at the RUVs-corrected, log2-transformed output
 one.dimension(cpm(normCounts(set1), log=T))
-title("RUVs")
+title("RUVs", cex.main=2)
 dev.off()
 
 # We also want to look at a heatmap of the significant covariates compared to each dimension of the PCA
@@ -329,8 +329,8 @@ RUV.hm$Association=log(RUV.hm$Association)
 # set up colour palette
 hm.palette <- colorRampPalette(brewer.pal(11, 'RdYlBu'), space='Lab')
 # Save output of both plots
-limma=ggplot(data = limma.hm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("Limma") 
-RUV=ggplot(data = RUV.hm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("RUVs") 
+limma=ggplot(data = limma.hm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5, size=20), axis.text.x = element_text(angle = 90, hjust = 1, size=12)) + ggtitle("Limma") 
+RUV=ggplot(data = RUV.hm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5, size=20), axis.text.x = element_text(angle = 90, hjust = 1, size=12)) + ggtitle("RUVs") 
 # use ggarange to plot both heatmpas
 pdf(paste0(outputdir,"Heatmap_SigCovar_RUVvsLM.pdf"), height=7, width=15)
 ggarrange(limma,RUV)
@@ -347,8 +347,10 @@ RUV.hm.lm=melt(RUV.pc.lm)
 RUV.hm.lm$Dimension=rep(1:5,ncol(RUV.pc.lm))
 colnames(RUV.hm.lm)[c(1,2)]=c("Covariate","Association")
 
-limma.lm=ggplot(data = limma.hm.lm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("Limma") + geom_text(aes(label = round(Association, 2)))
-RUV.lm=ggplot(data = RUV.hm.lm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 90, hjust = 1)) + ggtitle("RUVs") + geom_text(aes(label = round(Association, 2)))
+limma.lm=ggplot(data = limma.hm.lm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + 
+theme(legend.text=element_text(size=15), legend.title=element_text(size=15), plot.title = element_text(hjust = 0.5, size=20), axis.text.x = element_text(angle = 90, hjust = 1, size=15), axis.text.y = element_text(size=15),
+    axis.title.x = element_text(size=15), axis.title.y = element_text(size=15)) + ggtitle("Limma") + geom_text(aes(label = round(Association, 2)), size=5)
+RUV.lm=ggplot(data = RUV.hm.lm, aes(x = Covariate, y = Dimension)) + scale_y_continuous(trans = "reverse") + geom_tile(aes(fill = Association))  + scale_fill_gradientn(colours = hm.palette(100)) + theme(legend.title=element_text(size=15), legend.text=element_text(size=15), plot.title = element_text(hjust = 0.5, size=20), axis.text.y = element_text(size=15), axis.title.x = element_text(size=15), axis.title.y = element_text(size=15), axis.text.x = element_text(angle = 90, hjust = 1, size=15)) + ggtitle("RUVs") + geom_text(aes(label = round(Association, 2)), size=5)
 # use ggarange to plot both heatmaps
 pdf(paste0(outputdir,"Heatmap_SigCovar_RUVvsLM_OnlyCovarInLM.pdf"), height=7, width=15)
 ggarrange(limma.lm,RUV.lm)

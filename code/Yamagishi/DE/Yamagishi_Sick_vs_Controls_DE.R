@@ -56,7 +56,7 @@ outputdir="/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/O
 files.sick=list.files(path="/Users/katalinabobowik/Documents/UniMelb_PhD/Projects/Yamagishi", pattern="Filter", full.names=T)
 files.controls=list.files(path="/Users/katalinabobowik/Documents/UniMelb_PhD/Projects/Yamagishi/HealthyControls", pattern="Filter", full.names=T)
 
-# set up DGE matrix combining health and sick samples
+# set up DGE matrix combining healthy and sick samples
 y <- readDGE(c(files.sick, files.controls), columns=c(1,3)) 
 # Organising gene annotation using bioconductor's Homo.sapiens package, version 1.3.1 (Based on genome:  hg19)
 geneid <- rownames(y)
@@ -81,7 +81,6 @@ colnames(y) <- samplenames
 # Visualise library size
 pdf("librarysizeYamagishi_preFiltering.pdf", height=10, width=15)
 barplot(y$samples$lib.size*1e-6, ylab="Library size (millions)", cex.names=0.75, col=as.numeric(factor(y$samples$diseaseStatus)), names=colnames(y), las=3, ylim=c(0,max(y$samples$lib.size*1e-6)+10))
-abline(h=6, col="red")
 legend(x="topright", col=unique(as.numeric(factor(y$samples$diseaseStatus))), legend=c("malaria", "controls"), pch=15, cex=0.8)
 dev.off()
 
@@ -177,6 +176,20 @@ y=y[,which(y$samples$lib.size >= 9000000)]
 dim(y)
 # [1] 27413  124
 
+pdf("rarefactionCurves_postfiltering.pdf")
+for (name in covariate.names) {
+  plot(1:length(y$counts[,1]), cumsum(sort(y$counts[,1], decreasing=T)/sum(y$counts[,1])), log="x", type="n", xlab="Number of genes", ylab="Fraction of reads pool", ylim=c(0,1), main=name) ## initialize the plot area
+  counter=0
+  for (sample in colnames(y)){
+    counter=counter+1
+    lines(1:length(y$counts[,sample]), cumsum(sort(y$counts[,sample], decreasing=T)/sum(y$counts[,sample])), lwd=2, col=as.numeric(get(name))[counter])
+  }
+  levels=levels(get(name))
+  levels[which(is.na(levels))] = "NA"
+  legend(x="bottomright", bty="n", col=1:length(levels(get(name))), legend=levels, lty=1, lwd=2)
+}
+dev.off()
+
 # Visualise library size after filtering
 pdf("librarysizeYamagishi_postFiltering.pdf", height=10, width=15)
 barplot(y$samples$lib.size*1e-6, ylab="Library size (millions)", cex.names=0.75, col=as.numeric(factor(y$samples$diseaseStatus)), names=colnames(y), las=3, ylim=c(0,max(y$samples$lib.size*1e-6)+10))
@@ -260,14 +273,22 @@ dev.off()
 # Data exploration --------------------------------------------------------------------
 
 # Reassign covariates
-gender <- addNA(y$samples$gender)
-age <- addNA(cut(as.numeric(as.character(y$samples$age)), c(0,15,30,70), labels=c("0-15", "15-30", "30-70")))
+gender <- y$samples$gender
+age <- cut(as.numeric(as.character(y$samples$age)), c(0,15,30,70), labels=c("0-15", "15-30", "30-70"))
 lib.size <- cut(as.numeric(as.character(y$samples$lib.size)), c(0,1000000,10000000,20000000,40000000, 60000000), labels=c("0-1","1-10", "10-20", "20-40", "40-60"))
-PFload=addNA(cut(y$samples$PFload, c(-1,20,40,60,80), labels=c("0-20","20-40", "40-60", "60-80")))
+PFload=cut(y$samples$PFload, c(-1,20,40,60,80), labels=c("0-20","20-40", "40-60", "60-80"))
 diseaseStatus=y$samples$diseaseStatus
-location=addNA(y$samples$location)
+location=y$samples$location
 alignedPFPX=y$samples$alignedPFPX
 
+# we're missing three pieces of information: age, sex, and location. We can try and solve the location mystery by seeing how the samples are grouping including the 'niInfo' categories
+# reassign 'NA' values as a level
+for (name in covariate.names) {
+  assign(name, as.character(get(name)))
+  index=which(is.na(get(name)))
+  assign(name, as.factor(`[<-`(eval(as.name(name)),i = index, value = "noInfo")))
+
+}
 
 # plot MDS
 for (name in covariate.names) {
@@ -275,6 +296,11 @@ for (name in covariate.names) {
     title(main=name)
 }
 
+# we can see for location, Bitung and Manado are sitting pretty closely together, so we can assign a new variable as island and then analyse this instead of location
+Island=as.factor(rep("Island"), nrow(y$samples))
+y$samples$Island=Island
+
+# For sex, we can try and see
 
 # PCA plotting function
 plot.pca <- function(dataToPca, speciesCol, namesPch, sampleNames){

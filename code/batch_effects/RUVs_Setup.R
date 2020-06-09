@@ -70,29 +70,29 @@ hackedPCA=function(object,pc1,pc2,pch,color){
     labs <- sapply(seq_along(percent), function(i) {
             paste("PC ", i, " (", round(percent[i], 2), "%)", sep="")
     })
-    plot(s$u[,pc1], s$u[,pc2], xlab=labs[pc1], ylab=labs[pc2], pch=pch, col=color)
-    points(s$u[,pc1][which(allreplicated==T)], s$u[,pc2][which(allreplicated==T)], col="black", pch=8, cex=1)
-    text(s$u[,pc1][which(allreplicated==T)], s$u[,pc2][which(allreplicated==T)], labels=samplenames[which(allreplicated==T)], pos=1, cex=0.8)
+    plot(s$u[,pc1], s$u[,pc2], xlab=labs[pc1], ylab=labs[pc2], pch=pch, col=color, cex.axis=1.5, cex.lab=1.5, cex.main=2)
+    points(s$u[,pc1][which(allreplicated==T)], s$u[,pc2][which(allreplicated==T)], col="black", pch=8, cex=1.5)
+    text(s$u[,pc1][which(allreplicated==T)], s$u[,pc2][which(allreplicated==T)], labels=samplenames[which(allreplicated==T)], pos=1, cex=1.5)
 }
 
 # Normalisation can be performed using "median","upper", or "full", however when passing to edgeR's normalisation method (below), the only options are "TMM","RLE", and "upperquartile". In order to keep consistency, we'll go ahead and choose the "upper" method, since it's in both.
 # check normalisation before and after performing upper qiuartile normalisation
-pdf(paste0(outputdir,"Normalisation_beforeandAfterUQnorm.pdf"), height=15, width=15)
+pdf(paste0(outputdir,"Normalisation_beforeandAfterUQnorm.pdf"), height=12, width=12)
 par(mfrow=c(2,2))
-plotRLE(set, outline=FALSE, ylim=c(-2,2), col=batch.col[batch], xaxt='n', main="No Normalisation")
-legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col))
+plotRLE(set, outline=FALSE, ylim=c(-2,2), col=batch.col[batch], xaxt='n', main="No Normalisation", cex.main=2, cex.axis=1.5, cex.lab=1.5)
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=1.5, border=F, bty="n", col=unique(batch.col))
 # get PCA of batch and check how closely replictes sit to one another
 hackedPCA(object=counts(set), pc1=1, pc2=2, pch=as.numeric(allreplicated)+15, col=batch.col[batch])
-title("No Normalisation")
-legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col))
+title("No Normalisation", cex.main=2)
+legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=1.5, border=F, bty="n", col=unique(batch.col))
 
 # normalise with UQ normalisation
 set <- betweenLaneNormalization(set, which="upper")
-plotRLE(set, outline=FALSE, col=batch.col[batch], xaxt='n', main="Upper Quartile Normalisation", ylim=c(-2, 2))
-legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col[as.numeric(batch)]))
+plotRLE(set, outline=FALSE, col=batch.col[batch], xaxt='n', main="Upper Quartile Normalisation", ylim=c(-2, 2), cex.main=2, cex.axis=1.5, cex.lab=1.5)
+legend(legend=unique(as.numeric(y$samples$batch)), "topright", pch=15, title="Batch", cex=1.5, border=F, bty="n", col=unique(batch.col[as.numeric(batch)]))
 hackedPCA(object=normCounts(set), pc1=1, pc2=2, pch=as.numeric(allreplicated)+15, col=batch.col[batch])
-title("Upper Quartile Normalisation")
-legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=0.6, border=F, bty="n", col=unique(batch.col))
+title("Upper Quartile Normalisation", cex.main=2)
+legend(legend=unique(as.numeric(batch)), "topright", pch=15, title="Batch", cex=1.5, border=F, bty="n", col=unique(batch.col))
 dev.off()
 
 
@@ -108,14 +108,14 @@ for (i in 1:nrow(replicates)){
 genes <- rownames(y)
 
 # explore which value of k is the best by looking at variation in RLE and PCA plots
-pdf(paste0(outputdir,"RUVsNormalisation_choosingK.pdf"), height=15, width=12)
+pdf(paste0(outputdir,"RUVsNormalisation_choosingK.pdf"), height=15, width=10)
 par(mar=c(4.1,4.1,3.1,1.1), mfrow=c(6,2))
 for (i in c(1:6)){
     set1 <- RUVs(set, genes, k=i, replicates)
-    plotRLE(set1, main=paste0("k = ",i), col=as.numeric(batch), outline=FALSE, xaxt="n")
+    plotRLE(set1, main=paste0("k = ",i), col=as.numeric(batch), outline=FALSE, xaxt="n", cex.main=2, cex.axis=1.5, cex.lab=1.5)
     # plot PCA to see how closely replicates sit
     hackedPCA(normCounts(set1),pc1=1,pc2=2,pch=as.numeric(allreplicated)+15,color=lightcolors[allreplicated]) 
-    title(paste0("k = ",i))
+    title(paste0("k = ",i), cex.main=2)
 }
 dev.off()
 
@@ -168,10 +168,11 @@ for (j in 1:3){
 }
 
 # plot the number of DE genes for all population comparisons and all varying degrees of k
-pdf(paste0(outputdir,"numberDeGenes_choosingK_RUVs_.pdf"), height=5, width=15)
-par(mfrow=c(1,3))
+pdf(paste0(outputdir,"numberDeGenes_choosingK_RUVs.pdf"), height=5, width=13)
+par(mfrow=c(1,3), mar=c(5,7,5,0.5))
 for (i in c(1:3)){
-    plot(k, allGenes[[i]], main=names(allGenes)[i], ylab="n DE Genes")
+    plot(k, allGenes[[i]], main=names(allGenes)[i], ylab="", cex.main=2, cex.lab=1.8, cex.axis=1.8, pch=19, cex=1.5)
+    title(ylab="n DE Genes", cex.lab=2, line=4)
 }
 dev.off()
 

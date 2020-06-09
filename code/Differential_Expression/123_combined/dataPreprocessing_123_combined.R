@@ -30,6 +30,8 @@ wes=c("#3B9AB2", "#EBCC2A", "#F21A00", "#00A08A", "#ABDDDE", "#000000", "#FD6467
 palette(c(wes, brewer.pal(8,"Dark2")))
 # set up colour palette for batch
 batch.col=electronic_night(n=3)
+# set up colour palette for village
+village.col=c("#EBCC2A","chocolate","chocolate","#3B9AB2","#F21A00","chocolate","chocolate","#FD6467","#78B7C5","orange","chocolate")
 dev.off()
 
 # BEGIN ANALYSIS -----------------------------------------------------------
@@ -167,24 +169,24 @@ allreps=covariates[,"Sample.ID"][which(covariates$replicate)]
 allreps=unique(allreps)
 
 # look at how well replicate performed
-pdf(paste0(outputdir, "replicate_comparisons_noFiltering_123Combined.pdf"), height=10, width=10)
+pdf(paste0(outputdir, "replicate_comparisons_noFiltering_123Combined.pdf"), height=7, width=7)
 par(mfrow=c(3,3))
 # Since SMB-ANK-027 had two replicates, we need to plot one vs three and two vs three. First, one vs three
-smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[1]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=colnames(lcpm)[which(samplenames %in% allreps[1])[3]], xlab=colnames(lcpm)[which(samplenames %in% allreps[1])[1]], xlim=c(-5,15), ylim=c(-5,15), main="Technical replicate SMB-ANK-027")
+smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[1]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[3]], "[_.]"), `[`, 2), xlab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[1]], "[_.]"), `[`, 2), xlim=c(-5,15), ylim=c(-5,15), main="SMB-ANK-027")
 # best fit/regression line
 abline(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[1]]), col="green")
 # diagonal line
 abline(a=0,b=1,col="red")
 
 # Now, replicates two vs three
-smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[2]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=colnames(lcpm)[which(samplenames %in% allreps[1])[3]], xlab=colnames(lcpm)[which(samplenames %in% allreps[1])[2]], xlim=c(-5,15), ylim=c(-5,15), main="Technical replicate SMB-ANK-027")
+smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[2]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[3]], "[_.]"), `[`, 2), xlab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[2]], "[_.]"), `[`, 2), xlim=c(-5,15), ylim=c(-5,15), main="SMB-ANK-027")
 # best fit/regression line
 abline(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[2]]), col="green")
 # diagonal line
 abline(a=0,b=1,col="red")
 
 for (i in 1:length(allreps)){
-  smoothScatter(lcpm[,which(samplenames %in% allreps[i])[1]], lcpm[,which(samplenames %in% allreps[i])[2]], ylab=colnames(lcpm)[which(samplenames %in% allreps[i])[2]], xlab=colnames(lcpm)[which(samplenames %in% allreps[i])[1]], xlim=c(-5,15), ylim=c(-5,15), main=paste("Technical replicate", allreps[i], sep=" "))
+  smoothScatter(lcpm[,which(samplenames %in% allreps[i])[1]], lcpm[,which(samplenames %in% allreps[i])[2]], ylab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[i])[2]], "[_.]"), `[`, 2), xlab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[i])[1]], "[_.]"), `[`, 2), xlim=c(-5,15), ylim=c(-5,15), main=allreps[i])
   # best fit/regression line
   abline(lm(lcpm[,which(samplenames %in% allreps[i])[2]]~lcpm[,which(samplenames %in% allreps[i])[1]]), col="green")
   # diagonal line
@@ -220,11 +222,11 @@ dim(y)
 # [1] 12975   123
 
 # Visualise library size after filtering with barplots
-pdf(paste0(outputdir, "librarySize_indoRNA_postFiltering_123Combined.pdf"), height=10, width=15)
-  par(oma=c(2,0,0,0))
-  barplot(y$samples$lib.size*1e-6, ylab="Library size (millions)", cex.names=0.75, col=batch.col[y$samples$batch], names=samplenames, las=3, ylim=c(0,max(y$samples$lib.size*1e-6)+10), main="Library Size \n Post-filtering")
+pdf(paste0(outputdir, "librarySize_indoRNA_postFiltering_123Combined.pdf"), height=10, width=20)
+  par(oma=c(5,2,0,0))
+  barplot(y$samples$lib.size*1e-6, ylab="Library size (millions)", cex.lab=1.6, cex.names=1.3, cex.axis=1.6, cex.main=1.5, col=batch.col[y$samples$batch], names=samplenames, las=3, ylim=c(0,max(y$samples$lib.size*1e-6)+10), main="Library Size \n Post-filtering")
   # abline(h=10, col="red")
-  legend(x="topright", col=batch.col[unique(y$samples$batch)], legend=c("first batch", "second batch", "third batch"), pch=15, cex=0.8)
+  legend(x="topright", col=batch.col[unique(y$samples$batch)], legend=c("first batch", "second batch", "third batch"), pch=15, cex=1.5)
 dev.off()
 
 pdf(paste0(outputdir, "nGenes_indoRNA_postFiltering_123Combined.pdf"), height=10, width=15)
@@ -236,25 +238,26 @@ dev.off()
 # Compare library size density before and after removing lowly-expressed genes
 pdf(paste0(outputdir, "libraryDensity_afterFiltering_indoRNA.pdf"), height=8, width=15)
   nsamples <- ncol(y)
-  par(mfrow=c(1,2))
-  plot(density(lcpm[,1]), col=batch.col[y$samples$batch][1], lwd=2, ylim=c(0,max(density(lcpm)$y)+.1), las=2, main="", xlab="")
-  title(main="A. All genes", xlab="Log-cpm")
+  par(mfrow=c(1,2), mar=c(5,7,4,4))
+  plot(density(lcpm[,1]), ylab='', cex.axis=1.5, cex.lab=1.5, col=batch.col[y$samples$batch][1], lwd=2, ylim=c(0,max(density(lcpm)$y)+.1), las=2, main="", xlab="")
+  title(main="A. All genes", xlab="Log-cpm", cex.main=2, cex.lab=1.5)
+  title(ylab="Density", line=5, cex.lab=1.5)
   abline(v=0, lty=3)
   for (i in 2:nsamples){
       den <- density(lcpm[,i])
       lines(den$x, den$y, col=batch.col[y$samples$batch][i], lwd=2)
   }
-  legend("topright", legend=c("First Batch","Second Batch", "Third Batch"), ncol=1, cex=0.8, text.col=batch.col[unique(y$samples$batch)], bty="n")
+  legend("topright", legend=c("First Batch","Second Batch", "Third Batch"), ncol=1, cex=1.3, text.col=batch.col[unique(y$samples$batch)], bty="n")
 
   lcpm <- cpm(y, log=TRUE) # why are you defining this again in the middle of the plotting function?
-  plot(density(lcpm[,1]), col=batch.col[y$samples$batch][1], lwd=2, ylim=c(0,max(density(lcpm)$y)+.2), las=2, main="", xlab="")
-  title(main="B. Filtered genes", xlab="Log-cpm")
+  plot(density(lcpm[,1]), ylab='', cex.axis=1.5, cex.lab=1.5, col=batch.col[y$samples$batch][1], lwd=2, ylim=c(0,max(density(lcpm)$y)+.2), las=2, main="", xlab="")
+  title(main="B. Filtered genes", xlab="Log-cpm", cex.main=2, cex.lab=1.5)
   abline(v=0, lty=3)
   for (i in 2:nsamples){
       den <- density(lcpm[,i])
       lines(den$x, den$y, col=batch.col[y$samples$batch][i], lwd=2)
   }
-  legend("topright", legend=c("First Batch","Second Batch", "Third Batch"), ncol=1, cex=0.8, text.col=batch.col[unique(y$samples$batch)], bty="n")
+  legend("topright", legend=c("First Batch","Second Batch", "Third Batch"), ncol=1, cex=1.3, text.col=batch.col[unique(y$samples$batch)], bty="n")
 dev.off()
 
 # get histogram of lcpm
@@ -267,29 +270,30 @@ dev.off()
 # replicate analysis after removal of lowly-expressed genes ----------------------------------------------------------------
 
 # get correlation of technical replicates after filtering for lowly expressed genes
-pdf(paste0(outputdir, "replicate_comparisons_postFiltering_123Combined.pdf"), height=10, width=10)
-  par(mfrow=c(3,3))
-  # Since SMB-ANK-027 had two replicates, we need to plot one vs three and two vs three. First, one vs three
-  smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[1]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=colnames(lcpm)[which(samplenames %in% allreps[1])[3]], xlab=colnames(lcpm)[which(samplenames %in% allreps[1])[1]], xlim=c(-5,15), ylim=c(-5,15), main=paste("Technical replicate SMB-ANK-027", "\n", "r2 =",round(summary(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[1]]))$r.squared, digits=2)))
+pdf(paste0(outputdir, "replicate_comparisons_postFiltering_123Combined.pdf"), height=7, width=7)
+# look at how well replicate performed
+par(mfrow=c(3,3))
+# Since SMB-ANK-027 had two replicates, we need to plot one vs three and two vs three. First, one vs three
+smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[1]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[3]], "[_.]"), `[`, 2), xlab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[1]], "[_.]"), `[`, 2), xlim=c(-5,15), ylim=c(-5,15), main="SMB-ANK-027", cex.lab=1.5)
+# best fit/regression line
+abline(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[1]]), col="green")
+# diagonal line
+abline(a=0,b=1,col="red")
+
+# Now, replicates two vs three
+smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[2]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[3]], "[_.]"), `[`, 2), xlab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[1])[2]], "[_.]"), `[`, 2), xlim=c(-5,15), ylim=c(-5,15), main="SMB-ANK-027",cex.lab=1.5)
+# best fit/regression line
+abline(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[2]]), col="green")
+# diagonal line
+abline(a=0,b=1,col="red")
+
+for (i in 1:length(allreps)){
+  smoothScatter(lcpm[,which(samplenames %in% allreps[i])[1]], lcpm[,which(samplenames %in% allreps[i])[2]], ylab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[i])[2]], "[_.]"), `[`, 2), xlab=sapply(strsplit(colnames(lcpm)[which(samplenames %in% allreps[i])[1]], "[_.]"), `[`, 2), xlim=c(-5,15), ylim=c(-5,15), main=allreps[i], cex.lab=1.5)
   # best fit/regression line
-  abline(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[1]]), col="green")
+  abline(lm(lcpm[,which(samplenames %in% allreps[i])[2]]~lcpm[,which(samplenames %in% allreps[i])[1]]), col="green")
   # diagonal line
   abline(a=0,b=1,col="red")
-
-  # Now, replicates two vs three
-  smoothScatter(lcpm[,which(samplenames %in% "SMB-ANK-027")[2]], lcpm[,which(samplenames %in% "SMB-ANK-027")[3]], ylab=colnames(lcpm)[which(samplenames %in% allreps[1])[3]], xlab=colnames(lcpm)[which(samplenames %in% allreps[1])[2]], xlim=c(-5,15), ylim=c(-5,15), main=paste("Technical replicate SMB-ANK-027", "\n", "r2 =",round(summary(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[2]]))$r.squared, digits=2)))
-  # best fit/regression line
-  abline(lm(lcpm[,which(samplenames %in% "SMB-ANK-027")[3]]~lcpm[,which(samplenames %in% "SMB-ANK-027")[2]]), col="green")
-  # diagonal line
-  abline(a=0,b=1,col="red")
-
-  for (i in 1:length(allreps)){
-    smoothScatter(lcpm[,which(samplenames %in% allreps[i])[1]], lcpm[,which(samplenames %in% allreps[i])[2]], ylab=colnames(lcpm)[which(samplenames %in% allreps[i])[2]], xlab=colnames(lcpm)[which(samplenames %in% allreps[i])[1]], xlim=c(-5,15), ylim=c(-5,15), main=paste("Technical replicate ", allreps[i], "\n", "r2 =",round(summary(lm(lcpm[,which(samplenames %in% allreps[i])[2]]~lcpm[,which(samplenames %in% allreps[i])[1]]))$r.squared, digits=2)))
-    # best fit/regression line
-    abline(lm(lcpm[,which(samplenames %in% allreps[i])[2]]~lcpm[,which(samplenames %in% allreps[i])[1]]), col="green")
-    # diagonal line
-    abline(a=0,b=1,col="red")
-  }
+}
 dev.off()
 
 # normalise gene-expression distribution -------------------------------------------------
@@ -314,18 +318,18 @@ pdf(paste0(outputdir, "NormalisedGeneExpressionDistribution_IndoRNA_all3Methods.
   }
 dev.off()
 
-# now just plot how well TMM normalisation worked (since wqe like that one the best)
+# now just plot how well TMM normalisation worked (since we like that one the best)
 pdf(paste0(outputdir, "NormalisedGeneExpressionDistribution_IndoRNA_TMM.pdf"), height=15, width=15)
-  par(oma=c(2,0,0,0), mfrow=c(2,1))
+  par(oma=c(2,0,0,0), mfrow=c(2,1), mar=c(5,6,4,4))
   y2 <- y
   y2$samples$norm.factors <- 1
   lcpm <- cpm(y2, log=TRUE)
-  boxplot(lcpm, las=2, col=batch.col[as.numeric(batch)], main="", cex.axis=0.75, names=samplenames)
-  title(main="A. Unnormalised data",ylab="Log-cpm")
+  boxplot(lcpm, las=2, col=batch.col[as.numeric(batch)], main="", cex.axis=1.5, cex.lab=1.5, names=samplenames, xlab='', xaxt='n')
+  title(main="A. Unnormalised data",ylab="Log-cpm", cex.main=2, cex.lab=1.5)
   y2 <- calcNormFactors(y2, method="TMM")
   lcpm <- cpm(y2, log=TRUE)
-  boxplot(lcpm, las=2, col=batch.col[as.numeric(batch)], main="", cex.axis=0.75, names=samplenames)
-  title(main="B. Normalised data, TMM",ylab="Log-cpm")
+  boxplot(lcpm, las=2, col=batch.col[as.numeric(batch)], main="", xlab='', cex.axis=1.5, cex.lab=1.5, names=samplenames, xaxt='n')
+  title(main="B. Normalised data, TMM",ylab="Log-cpm", cex.main=2, cex.lab=1.5)
 dev.off()
 
 # recalculate lcpm

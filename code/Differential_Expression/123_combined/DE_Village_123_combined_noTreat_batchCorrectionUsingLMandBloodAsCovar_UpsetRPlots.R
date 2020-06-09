@@ -19,6 +19,7 @@ library(circlize)
 library(ComplexHeatmap)
 library(EnsDb.Hsapiens.v86)
 library(wesanderson)
+library(UpSetR)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/dataPreprocessing/"
@@ -44,8 +45,6 @@ mtw_mpi <- "darkorchid4"
 # set up colour palette for batch
 batch.col=electronic_night(n=3)
 village.col=c("#EBCC2A","chocolate","chocolate","#3B9AB2","#F21A00","chocolate","chocolate","chocolate","#78B7C5","orange","chocolate")
-
-dev.off()
 
 
 # Load log CPM matrix and y object:
@@ -398,10 +397,14 @@ all.pcs <- pc.assoc(pcaresults)
 all.pcs$Variance <- pcaresults$sdev^2/sum(pcaresults$sdev^2)
 write.table(all.pcs, file=paste0(outputdir,"pca_covariates_blood_RNASeqDeconCell.txt"), col.names=T, row.names=F, quote=F, sep="\t")
 
+# get rid of covariates we aren't interested in for the heatmap
+covariate.names=covariate.names[grep("lib.size|ID|microscopy.pos|PCR.pos|fract.pfpx.reads|replicate|ind",covariate.names, invert=T)]
+
 # plot pca covariates association matrix to illustrate any remaining confounding/batch
 pdf(paste0(outputdir,"significantCovariates_AnovaHeatmap.pdf"))
 pheatmap(log(all.pcs[1:5,covariate.names]), cluster_col=F, col= colorRampPalette(brewer.pal(11, "RdYlBu"))(100), cluster_rows=F, main="Significant Covariates \n Anova")
 dev.off()
+
 
 # Summary and visualisation of gene trends ---------------------------------------------------------------------------
 
@@ -493,6 +496,11 @@ pdf(paste0(outputdir, "UpsetR_SamplingSiteComparison_by_village_allfcs.pdf"), wi
     upset(as.data.frame(abs(byVillages1)), sets = c("ANKvsMDB", "ANKvsTLL", "WNGvsMDB", "WNGvsTLL", "ANKvsMPI", "WNGvsMPI", "MDBvsMPI", "TLLvsMPI", "ANKvsWNG", "MDBvsTLL"), sets.bar.color = c(rep(smb_mtw,4), rep(smb_mpi, 2), rep(mtw_mpi, 2), sumba, mentawai), nintersects=50,  order.by = "freq", keep.order=T)
 dev.off()
 
+# now just plot one upsetR plot
+pdf(paste0(outputdir, "UpsetR_SamplingSiteComparison_by_village_lfc05.pdf"))
+    upset(as.data.frame(abs(byVillages05)), sets = c("ANKvsMDB", "ANKvsTLL", "WNGvsMDB", "WNGvsTLL", "ANKvsMPI", "WNGvsMPI", "MDBvsMPI", "TLLvsMPI", "ANKvsWNG", "MDBvsTLL"), sets.bar.color = c(rep(smb_mtw,4), rep(smb_mpi, 2), rep(mtw_mpi, 2), sumba, mentawai), nintersects=50,  order.by = "freq", keep.order=T)
+dev.off()
+
 # first see which logFC threshold is best
 logFC.df=matrix(nrow=3,ncol=ncol(efit))
 colnames(logFC.df)=colnames(efit)
@@ -506,6 +514,8 @@ for (number in c(0,0.5,1)){
 # add in column specifying logFC
 logFC.df=cbind(logFC = c(0,0.5,1), logFC.df)
 write.table(logFC.df, file="logFC_thresholds.txt", sep="\t", quote=F)
+
+
 
 
 

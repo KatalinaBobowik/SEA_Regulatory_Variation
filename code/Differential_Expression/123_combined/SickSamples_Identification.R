@@ -104,7 +104,15 @@ identical(number.unmapped.reads.df$Sample.ID, colnames(pfpx))
 
 pdf(paste0(outputdir,"FractionReadsMappingToPlasmodium_NormalisedByUnmappedReads.pdf"), height=10, width=15)
 par(oma=c(5,0,0,0))
-barplot(pfpx$samples$lib.size/number.unmapped.reads.df$Unmapped.Reads, ylab="Fraction of Total Unmapped Reads", cex.names=0.75,names=samplenames.plas, col=as.numeric(as.factor(covariates$Island)), las=3, main="Fraction of Combined Falc & Vivax Reads\n Normalised By Total Reads")
+barplot(pfpx$samples$lib.size/number.unmapped.reads.df$Unmapped.Reads, ylab="Fraction of Total Unmapped Reads", cex.names=0.75,names=samplenames.plas, col=as.numeric(as.factor(covariates$Island)), las=3, main="Fraction of Combined Falc & Vivax Reads\n Normalised By Total Unmapped Reads")
+dev.off()
+
+# barplot marking our samples with a star and sorting by highest number of counts
+infected=c("SMB-PTB-028","MPI-345","MPI-025","MPI-334")
+pdf(paste0(outputdir,"FractionReadsMappingToPlasmodium_NormalisedByUnmappedReads_sorted_MarkedSamples.pdf"), height=10, width=15)
+par(oma=c(5,0,0,0))
+b=barplot(sort(pfpx$samples$lib.size/number.unmapped.reads.df$Unmapped.Reads, decreasing = T), ylab="Fraction of Total Unmapped Reads", cex.names=0.75,names=samplenames.plas[order(pfpx$samples$lib.size/number.unmapped.reads.df$Unmapped.Reads, decreasing = T)], ylim=c(0,0.35), col=as.numeric(as.factor(covariates$Island))[sort(pfpx$samples$lib.size/number.unmapped.reads.df$Unmapped.Reads, index.return=T, decreasing=T)$ix], las=3, main="Fraction of Combined Falc & Vivax Reads\n Normalised By Total Unmapped Reads")
+text(b,sort(pfpx$samples$lib.size/number.unmapped.reads.df$Unmapped.Reads, decreasing=T),ifelse(samplenames.plas[order(pfpx$samples$lib.size/number.unmapped.reads.df$Unmapped.Reads, decreasing=T)] %in% infected,"*",""),pos=3,cex=1.5,xpd=NA)
 dev.off()
 
 # make a table of all samples that have malaria, confirmed by PCR and number of reads
@@ -151,14 +159,14 @@ rm(featureCountsOut.yam.all) # clean up, big object
 cols=c(rep(7,length(grep("Sick", colnames(pfpx.yam)))), rep(8,length(grep("Controls", colnames(pfpx.yam)))))
 
 # plot and see which samples are infected
-pdf(paste0(outputdir,"Plasmodium_LibrarySize.pdf"), height=10, width=15)
+pdf(paste0(outputdir,"Plasmodium_LibrarySize_Yamagishi.pdf"), height=10, width=15)
 par(oma=c(5,0,0,0))
 barplot(pfpx.yam$samples$lib.size, ylab="Library size (millions)", cex.names=0.75,names=colnames(pfpx.yam), col=cols, las=3, main="Number of Raw Reads \nCombined Falc & Vivax")
 legend(x="topright", col=unique(cols), legend=c("Sick","Control"), pch=15, cex=0.8)
 dev.off()
 
 # Total number of genes
-pdf(paste0(outputdir,"nGenes_plasmodium.pdf"), height=10, width=15)
+pdf(paste0(outputdir,"nGenes_plasmodium_Yamagishi.pdf"), height=10, width=15)
 par(oma=c(5,0,0,0))
 barplot(apply(pfpx$counts, 2, function(c)sum(c!=0)),main="Number of Genes\nCombined Falc & Vivax", ylab="n Genes", cex.names=0.75, col=cols, names=samplenames.plas, las=3, ylim=c(0,max(apply(pfpx$counts, 2, function(c)sum(c!=0)))+1000))
 legend(x="topright", col=unique(as.numeric(as.factor(covariates$Island))), legend=c("Mappi", "Mentawai", "Sumba"), pch=15, cex=0.8)
@@ -172,14 +180,44 @@ colnames(number.unmapped.reads.df.yam)=c("Sample.ID","Unmapped.Reads")
 # Reorder the unmapped reads df
 number.unmapped.reads.df.yam=number.unmapped.reads.df.yam[match(colnames(pfpx.yam), number.unmapped.reads.df.yam$Sample.ID),]
 identical(colnames(pfpx.yam), as.character(number.unmapped.reads.df.yam$Sample.ID))
+#[1] TRUE
+
+# save information to file
+fract.reads.pfpx.yam=pfpx.yam$samples$lib.size/number.unmapped.reads.df.yam$Unmapped.Reads
+malaria.summary.yam=data.frame(colnames(pfpx.yam),fract.reads.pfpx.yam)
+write.table(malaria.summary.yam, file=paste0(outputdir,"Malaria_summary_table_Yamagishi.txt"), quote=F, row.names=F, col.names=T, sep="\t")
 
 pdf(paste0(outputdir,"FractionReadsMappingToPlasmodium_NormalisedByUnmappedReads.pdf"), height=10, width=15)
 par(oma=c(5,0,0,0))
 barplot(pfpx.yam$samples$lib.size/number.unmapped.reads.df.yam$Unmapped.Reads, ylab="Fraction of Total Unmapped Reads", cex.names=0.75,names=colnames(pfpx.yam), col=cols, las=3, main="Fraction of Combined Falc & Vivax Reads\n Normalised By Total Reads")
 dev.off()
 
-fract.reads.pfpx.yam=pfpx.yam$samples$lib.size/number.unmapped.reads.df.yam$Unmapped.Reads
-malaria.summary.yam=data.frame(colnames(pfpx.yam),fract.reads.pfpx.yam)
-write.table(malaria.summary.yam, file=paste0(outputdir,"Malaria_summary_table_Yamagishi.txt"), quote=F, row.names=F, col.names=T, sep="\t")
+# replot after filtering out samples with small library sizes
+# load in Yamagishi data
+load("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/Yamagishi/unfiltered_DGElistObject.Rda")
+y=y[,which(y$samples$lib.size >= 9000000)]
+dim(y)
+# [1] 27413   124
+
+# make colmn names in Yamagishi plasmodium count object and human read data count object the same
+yam.plasmo.id=sapply(strsplit(colnames(pfpx.yam), "[_.]"), `[`, 1)
+
+# filter 
+pfpx.yam=pfpx.yam[,which(yam.plasmo.id %in% colnames(y))]
+# Reorder the unmapped reads df
+number.unmapped.reads.df.yam=number.unmapped.reads.df.yam[match(colnames(pfpx.yam), number.unmapped.reads.df.yam$Sample.ID),]
+identical(colnames(pfpx.yam), as.character(number.unmapped.reads.df.yam$Sample.ID))
+# double the reads column, as I messed up and divided this by 2 (for paired end, hangover from another script)
+number.unmapped.reads.df.yam$Unmapped.Reads = number.unmapped.reads.df.yam$Unmapped.Reads * 2
+
+# replot
+cols=c(rep(7,length(grep("Sick", colnames(pfpx.yam)))), rep(8,length(grep("Controls", colnames(pfpx.yam)))))
+pdf(paste0(outputdir,"FractionReadsMappingToPlasmodium_NormalisedByUnmappedReads_Filtered.pdf"), height=10, width=15)
+par(oma=c(5,0,0,0))
+barplot(pfpx.yam$samples$lib.size/number.unmapped.reads.df.yam$Unmapped.Reads, ylab="Fraction of Total Unmapped Reads", cex.names=0.75,names=colnames(pfpx.yam), col=cols, las=3, main="Fraction of Combined Falc & Vivax Reads\n Normalised By Total Reads")
+abline(h=0.01, col="black", lty=3)
+dev.off()
+
+
 
 

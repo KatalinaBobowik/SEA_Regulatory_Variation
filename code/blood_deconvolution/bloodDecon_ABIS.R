@@ -8,6 +8,7 @@ library(shiny)
 library(dplyr)
 library(tidyverse)
 library(scater)
+library(biomaRt)
 
 # Set paths:
 inputdir = "/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/DE_Analysis/123_combined/countData/"
@@ -26,7 +27,8 @@ dim(y$counts)
 # First, convert expression data to counts per million
 cpm <- cpm(y)
 # Rownames must be HGNC symbols so we'll use Biomart to convert Ensembl IDs to HGNC symbols
-all.gene.IDs=getBM(attributes = c("ensembl_gene_id",'hgnc_symbol'), mart = ensembl.mart.90,values=rownames(cpm), filters="ensembl_gene_id")
+ensembl.mart.90 <- useMart(biomart='ENSEMBL_MART_ENSEMBL', dataset='hsapiens_gene_ensembl', host = 'www.ensembl.org', ensemblRedirect = FALSE)
+all.gene.IDs=getBM(attributes = c("ensembl_gene_id","hgnc_symbol"), mart = ensembl.mart.90,values=rownames(cpm), filters="ensembl_gene_id")
 new.rownames=all.gene.IDs$hgnc_symbol[match(rownames(cpm),all.gene.IDs$ensembl_gene_id)]
 rownames(cpm)=new.rownames
 # get rid of emty and NA values (note: filtering doesn't actually do anything to the results of the samples, but it's nice to haev an organised list of actual gene names)
@@ -61,8 +63,11 @@ colnames(predicted.cellcounts)=gsub(" ", ".",colnames(predicted.cellcounts))
 # merge Neutrophils LD and Basophils LD and make into Granulocytes
 predicted.cellcounts=cbind(Granulocytes=predicted.cellcounts$Neutrophils.LD + predicted.cellcounts$Basophils.LD, predicted.cellcounts)
 predicted.cellcounts=predicted.cellcounts[,-c(2,3)]
+# write table
+write.table(predicted.cellcounts, file=paste0(outputdir,"predictedCellCounts_ABIS.txt"))
 # scale to sum to 100 (rowSums will add to 100)
 predicted.cellcounts.scaled <- (predicted.cellcounts/rowSums(predicted.cellcounts))*100
+write.table(predicted.cellcounts.scaled, file=paste0(outputdir,"predictedCellCounts_ABIS_scaled.txt"))
 
 # barplot
 pdf(paste0(outputdir,"ABIS_RNASeqDeconvolution.pdf"), height=10,width=19)

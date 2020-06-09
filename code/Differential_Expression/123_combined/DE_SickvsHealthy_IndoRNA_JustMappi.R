@@ -229,7 +229,7 @@ y$samples$Age[which(is.na(y$samples$Age) == T)]=45
 # Set up design matrix. Island information isn't necessary here since we're only testing Mappi
 # Note: you need a replicate for each covariate incorporated into the model. I had to take out RIN and blood types for this reason, as they all only had one.
 # Alternatively, I can put in sample replicates 
-design <- model.matrix(~0 + y$samples$DiseaseStatus + y$samples$Island + y$samples$batch)
+design <- model.matrix(~0 + y$samples$fract.pfpx.reads + y$samples$Island + y$samples$batch)
 design <- model.matrix(~0 + y$samples$DiseaseStatus + y$samples$batch)
 
 

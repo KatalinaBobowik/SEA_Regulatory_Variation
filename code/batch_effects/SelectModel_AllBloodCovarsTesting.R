@@ -59,7 +59,7 @@ designlist$simple=design_simple
 designlist$noCD8T=design_noCD8T
 designlist$noBcell=design_noBcell
 designlist$noNK=design_noNK
-designlist$full=design_ful
+designlist$full=design_full
 
 out=selectModel(lcpm, designlist)
 table(out$pref)
