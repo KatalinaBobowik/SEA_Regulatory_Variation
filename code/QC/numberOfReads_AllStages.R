@@ -10,7 +10,7 @@ library(DescTools)
 setwd("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Output/Paper_Figures")
 
 # read in summary file and tidy up 
-a=read.table("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/Thesis_Writing/Tables/Table2_TotalnReads_AllSamples.txt", header=T, sep="\t")
+a=read.table("/Users/katalinabobowik/Documents/UniMelb_PhD/Analysis/UniMelb_Sumba/Scripts/GIT/0.NoLongerTracked/Thesis_Writing/Tables/Table2_TotalnReads_AllSamples.txt", header=T, sep="\t")
 a=a[1:123,1:5]
 rownames(a)=make.unique(as.character(a[,1]))
 a$Sample = NULL
